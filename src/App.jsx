@@ -1,16 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase, CLOUD_STATE_ID } from './lib/supabase'
-import { CATEGORIES, COACHES, PHASES, emptyArchive, normalizeArchive, upper } from './lib/archive'
+import {
+  ADMIN_PASSWORD, CATEGORIES, COACHES, PHASES, emptyArchive, makeAuditEntry,
+  normalizeArchive, readLegacyArchive, upper
+} from './lib/archive'
 import Login from './components/Login'
 import SessionModal from './components/SessionModal'
 import ExerciseModal from './components/ExerciseModal'
 import Matches from './components/Matches'
 import './styles.css'
 
+const HISTORY_LIMIT = 100
+
 export default function App() {
   const [auth, setAuth] = useState(undefined)
   const [archive, setArchive] = useState(emptyArchive)
   const [status, setStatus] = useState('CONNESSIONE…')
+  const [hydrated, setHydrated] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('')
   const [view, setView] = useState('sessions')
   const [search, setSearch] = useState('')
@@ -20,8 +26,19 @@ export default function App() {
   const [sort, setSort] = useState('recent')
   const [sessionModal, setSessionModal] = useState(null)
   const [exerciseModal, setExerciseModal] = useState(null)
+  const [toast, setToast] = useState('')
   const saveTimer = useRef(null)
   const applyingRemote = useRef(false)
+  const undoStack = useRef([])
+  const redoStack = useRef([])
+  const fileInput = useRef(null)
+  const legacyArchive = useMemo(() => readLegacyArchive(), [])
+
+  const showToast = useCallback(message => {
+    setToast(message)
+    window.clearTimeout(showToast.timer)
+    showToast.timer = window.setTimeout(() => setToast(''), 2200)
+  }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({data}) => setAuth(data.session))
@@ -33,14 +50,26 @@ export default function App() {
     if (!auth) return
     let channel
     async function start() {
+      setHydrated(false)
       setStatus('CARICAMENTO CLOUD…')
       const { data, error } = await supabase.from('app_state').select('data').eq('id', CLOUD_STATE_ID).maybeSingle()
       if (error) { setStatus('ERRORE CLOUD'); console.error(error); return }
       const cloud = data?.data && Object.keys(data.data).length ? normalizeArchive(data.data) : emptyArchive()
-      applyingRemote.current = true; setArchive(cloud); applyingRemote.current = false
+      applyingRemote.current = true
+      setArchive(cloud)
+      undoStack.current = []
+      redoStack.current = []
+      applyingRemote.current = false
+      setHydrated(true)
       setStatus('ARCHIVIO SINCRONIZZATO')
       channel = supabase.channel('acq-v24').on('postgres_changes',{event:'*',schema:'public',table:'app_state',filter:`id=eq.${CLOUD_STATE_ID}`}, payload => {
-        if (payload.new?.data) { applyingRemote.current=true; setArchive(normalizeArchive(payload.new.data)); applyingRemote.current=false; setStatus('AGGIORNATO DA ALTRO DISPOSITIVO') }
+        if (payload.new?.data) {
+          applyingRemote.current = true
+          setArchive(normalizeArchive(payload.new.data))
+          applyingRemote.current = false
+          setStatus('AGGIORNATO DA ALTRO DISPOSITIVO')
+          window.setTimeout(() => setStatus('ARCHIVIO SINCRONIZZATO'), 1800)
+        }
       }).subscribe()
     }
     start()
@@ -48,7 +77,7 @@ export default function App() {
   }, [auth])
 
   useEffect(() => {
-    if (!auth || applyingRemote.current) return
+    if (!auth || !hydrated || applyingRemote.current) return
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
       setStatus('SALVATAGGIO…')
@@ -58,7 +87,54 @@ export default function App() {
       if(error) console.error(error)
     }, 700)
     return () => clearTimeout(saveTimer.current)
-  }, [archive, auth])
+  }, [archive, auth, hydrated])
+
+  const commit = useCallback((updater, action = 'MODIFICA ARCHIVIO', details = '') => {
+    setArchive(previous => {
+      const nextRaw = typeof updater === 'function' ? updater(previous) : updater
+      const next = normalizeArchive({
+        ...nextRaw,
+        audit: [...(nextRaw.audit || []), makeAuditEntry(action, details)].slice(-200),
+        updatedAt: new Date().toISOString(),
+      })
+      if (JSON.stringify(previous) === JSON.stringify(next)) return previous
+      undoStack.current.push(previous)
+      if (undoStack.current.length > HISTORY_LIMIT) undoStack.current.shift()
+      redoStack.current = []
+      return next
+    })
+  }, [])
+
+  const undo = useCallback(() => {
+    if (!undoStack.current.length) { showToast('NESSUNA OPERAZIONE DA ANNULLARE'); return }
+    setArchive(current => {
+      redoStack.current.push(current)
+      const previous = undoStack.current.pop()
+      showToast('OPERAZIONE ANNULLATA · ⌘Z')
+      return previous
+    })
+  }, [showToast])
+
+  const redo = useCallback(() => {
+    if (!redoStack.current.length) { showToast('NESSUNA OPERAZIONE DA RIPRISTINARE'); return }
+    setArchive(current => {
+      undoStack.current.push(current)
+      const next = redoStack.current.pop()
+      showToast('OPERAZIONE RIPRISTINATA · ⇧⌘Z')
+      return next
+    })
+  }, [showToast])
+
+  useEffect(() => {
+    const handler = event => {
+      const editing = event.target?.matches?.('input,textarea,select') || event.target?.isContentEditable
+      if (editing || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return
+      event.preventDefault()
+      event.shiftKey ? redo() : undo()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [undo, redo])
 
   const categorySessions = useMemo(() => archive.sessions.filter(s => !selectedCategory || s.category === selectedCategory), [archive.sessions, selectedCategory])
   const filteredExercises = useMemo(() => {
@@ -72,23 +148,93 @@ export default function App() {
   },[archive.exercises,selectedCategory,phase,rating,search,sort])
   const visibleSessions = categorySessions.filter(s => (!coach || s.coach===coach) && (!search || upper([s.coach,s.objective].join(' ')).includes(upper(search)) || filteredExercises.some(e=>e.sessionId===s.id)))
 
-  function saveSession(item) { setArchive(a => ({...a,sessions:a.sessions.some(s=>s.id===item.id)?a.sessions.map(s=>s.id===item.id?item:s):[...a.sessions,item]})); setSessionModal(null) }
-  function deleteSession(id) { if(!confirm('ELIMINARE LA SESSIONE E TUTTE LE ESERCITAZIONI AL SUO INTERNO?'))return; setArchive(a=>({...a,sessions:a.sessions.filter(s=>s.id!==id),exercises:a.exercises.filter(e=>e.sessionId!==id)})) }
-  function saveExercise(item) { setArchive(a=>({...a,exercises:a.exercises.some(e=>e.id===item.id)?a.exercises.map(e=>e.id===item.id?item:e):[...a.exercises,item]}));setExerciseModal(null) }
-  function deleteExercise(id){if(confirm('ELIMINARE QUESTA ESERCITAZIONE?'))setArchive(a=>({...a,exercises:a.exercises.filter(e=>e.id!==id)}))}
+  function authorize(message = 'INSERISCI LA PASSWORD:') {
+    const password = window.prompt(message)
+    if (password === null) return false
+    if (password !== ADMIN_PASSWORD) { window.alert('PASSWORD ERRATA. OPERAZIONE ANNULLATA.'); return false }
+    return true
+  }
+
+  function saveSession(item) {
+    const exists = archive.sessions.some(s => s.id === item.id)
+    commit(a => ({...a,sessions:exists?a.sessions.map(s=>s.id===item.id?item:s):[...a.sessions,item]}), exists ? 'MODIFICA SESSIONE' : 'CREA SESSIONE', item.coach)
+    setSessionModal(null)
+  }
+
+  function deleteSession(id) {
+    const session = archive.sessions.find(s => s.id === id)
+    const count = archive.exercises.filter(e => e.sessionId === id).length
+    if(!confirm(`ELIMINARE LA SESSIONE E LE ${count} ESERCITAZIONI AL SUO INTERNO?`)) return
+    if(!authorize('PASSWORD PER ELIMINARE LA SESSIONE:')) return
+    commit(a=>({...a,sessions:a.sessions.filter(s=>s.id!==id),exercises:a.exercises.filter(e=>e.sessionId!==id)}), 'ELIMINA SESSIONE', session?.coach)
+  }
+
+  function saveExercise(item, initial) {
+    const previous = archive.exercises.find(e => e.id === item.id)
+    const ratingChanged = Number(item.rating || 0) !== Number(previous?.rating || 0)
+    if (ratingChanged && Number(item.rating || 0) > 0 && !authorize('PASSWORD PER SALVARE LA VALUTAZIONE:')) return
+    const exists = Boolean(previous)
+    commit(a=>({...a,exercises:exists?a.exercises.map(e=>e.id===item.id?item:e):[...a.exercises,item]}), exists ? 'MODIFICA ESERCITAZIONE' : 'CREA ESERCITAZIONE', item.title)
+    setExerciseModal(null)
+  }
+
+  function deleteExercise(id) {
+    const item = archive.exercises.find(e => e.id === id)
+    if(!confirm('ELIMINARE QUESTA ESERCITAZIONE?')) return
+    if(!authorize("PASSWORD PER ELIMINARE L'ESERCITAZIONE:")) return
+    commit(a=>({...a,exercises:a.exercises.filter(e=>e.id!==id)}), 'ELIMINA ESERCITAZIONE', item?.title)
+  }
+
+  function exportArchive() {
+    const payload = JSON.stringify({ ...archive, exportedAt: new Date().toISOString() }, null, 2)
+    const blob = new Blob([payload], { type: 'application/json' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `ACQ_ARCHIVIO_${new Date().toISOString().slice(0,10)}.json`
+    link.click()
+    URL.revokeObjectURL(link.href)
+    showToast('BACKUP ESPORTATO')
+  }
+
+  async function importArchive(file) {
+    if (!file) return
+    try {
+      const parsed = JSON.parse(await file.text())
+      const next = normalizeArchive(parsed)
+      if (!confirm(`IMPORTARE ${next.sessions.length} SESSIONI E ${next.exercises.length} ESERCITAZIONI? L'OPERAZIONE È ANNULLABILE CON ⌘Z.`)) return
+      if (!authorize('PASSWORD PER IMPORTARE IL BACKUP:')) return
+      commit(next, 'IMPORTA ARCHIVIO', file.name)
+      showToast('ARCHIVIO IMPORTATO')
+    } catch (error) {
+      console.error(error)
+      alert('FILE NON VALIDO O DANNEGGIATO.')
+    } finally {
+      if (fileInput.current) fileInput.current.value = ''
+    }
+  }
+
+  function migrateLegacy() {
+    if (!legacyArchive) return
+    if (!confirm(`MIGRARE ${legacyArchive.sessions.length} SESSIONI E ${legacyArchive.exercises.length} ESERCITAZIONI DALLA V23?`)) return
+    if (!authorize('PASSWORD PER MIGRARE I DATI V23:')) return
+    commit(legacyArchive, 'MIGRAZIONE V23', 'LOCALSTORAGE')
+    showToast('DATI V23 MIGRATI NEL CLOUD')
+  }
 
   if(auth===undefined) return <div className="loading">CARICAMENTO…</div>
   if(!auth) return <Login />
 
   return <div className="app-shell">
-    <header className="hero"><div><small>ARCHIVIO METODOLOGICO ACQUACETOSA</small><h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1></div><img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`}/><b>2026/27</b><nav><button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button><button>RIUNIONI TECNICHE</button><button>MATERIALE DIDATTICO</button><button className="glass" onClick={()=>supabase.auth.signOut()}>ESCI</button></nav></header>
+    <header className="hero"><div><small>ARCHIVIO METODOLOGICO ACQUACETOSA</small><h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1></div><img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`}/><b>2026/27</b><nav><button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button><button>RIUNIONI TECNICHE</button><button>MATERIALE DIDATTICO</button><button className="glass" onClick={exportArchive}>ESPORTA</button><button className="glass" onClick={()=>fileInput.current?.click()}>IMPORTA</button>{legacyArchive && <button className="glass" onClick={migrateLegacy}>MIGRA V23</button>}<button className="glass" onClick={()=>supabase.auth.signOut()}>ESCI</button><input ref={fileInput} hidden type="file" accept="application/json,.json" onChange={e=>importArchive(e.target.files?.[0])}/></nav></header>
+    <section className="history-bar"><button onClick={undo} disabled={!undoStack.current.length}>↶ ANNULLA</button><button onClick={redo} disabled={!redoStack.current.length}>↷ RIPRISTINA</button><span>⌘Z / CTRL+Z · CRONOLOGIA FINO A 100 MODIFICHE</span></section>
     <section className="filters"><input placeholder="CERCA PER TITOLO, OBIETTIVO O PAROLA CHIAVE…" value={search} onChange={e=>setSearch(e.target.value)}/><select value={coach} onChange={e=>setCoach(e.target.value)}><option value="">ALLENATORI</option>{COACHES.map(v=><option key={v}>{v}</option>)}</select><select value={selectedCategory} onChange={e=>setSelectedCategory(e.target.value)}><option value="">CATEGORIE</option>{CATEGORIES.map(v=><option key={v}>{v}</option>)}</select><select value={rating} onChange={e=>setRating(e.target.value)}><option value="">VALUTAZIONI</option>{[1,2,3,4,5].map(v=><option key={v} value={v}>{v} STELLE</option>)}</select><select value={phase} onChange={e=>setPhase(e.target.value)}><option value="">FASE ALLENAMENTO</option>{PHASES.map(v=><option key={v}>{v}</option>)}</select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="recent">PIÙ RECENTI</option><option value="az">A-Z</option><option value="players">N° GIOCATORI</option></select></section>
     <section className="category-strip"><button className={!selectedCategory?'active':''} onClick={()=>setSelectedCategory('')}><span>▦</span><b>ARCHIVIO COMPLETO</b><small>{archive.sessions.length}SS / {archive.exercises.length}ES</small></button>{CATEGORIES.map(c=>{const ss=archive.sessions.filter(s=>s.category===c).length,es=archive.exercises.filter(e=>e.category===c).length;return <button key={c} className={selectedCategory===c?'active':''} onClick={()=>setSelectedCategory(c)}><span>⚽</span><b>{c}</b><small>{ss}SS / {es}ES</small></button>})}</section>
     <nav className="view-tabs"><button className={view==='sessions'?'active':''} onClick={()=>setView('sessions')}>SESSIONI ALLENAMENTO</button><button className={view==='library'?'active':''} onClick={()=>setView('library')}>LIBRERIA ESERCITAZIONI</button>{selectedCategory&&<button className={view==='matches'?'active':''} onClick={()=>setView('matches')}>PARTITE</button>}</nav>
     {view==='sessions' && <main>{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}'</p></div><div><button onClick={()=>setExerciseModal({session:s})}>＋ ESERCITAZIONE</button><button className="soft" onClick={()=>setSessionModal(s)}>MODIFICA</button><button className="soft" onClick={()=>deleteSession(s.id)}>ELIMINA</button></div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
     {view==='library' && <main><div className="section-title"><div><h2>LIBRERIA ESERCITAZIONI</h2><p>TUTTE LE ESERCITAZIONI DELL’ARCHIVIO.</p></div><b>{filteredExercises.length} ESERCITAZIONI</b></div><div className="exercise-grid library">{filteredExercises.map(e=>{const s=archive.sessions.find(x=>x.id===e.sessionId);return <ExerciseCard e={e} key={e.id} onEdit={()=>s&&setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>})}</div></main>}
-    {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} onChange={items=>setArchive(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}))}/></main>}
+    {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} onChange={items=>commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory)}/></main>}
     <div className="cloud-pill">● {status}</div>
+    {toast && <div className="action-toast">{toast}</div>}
     {sessionModal && <SessionModal initial={sessionModal.id?sessionModal:null} onSave={saveSession} onClose={()=>setSessionModal(null)}/>} 
     {exerciseModal && <ExerciseModal session={exerciseModal.session} initial={exerciseModal.initial} onSave={saveExercise} onClose={()=>setExerciseModal(null)}/>} 
   </div>

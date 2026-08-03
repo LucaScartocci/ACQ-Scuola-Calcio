@@ -1,27 +1,23 @@
-# Piano v24 Cloud
+# Stato sviluppo ACQ Cloud
 
-## Fase 1 — Fondamenta (in questa consegna)
-- React + Vite
-- Supabase Auth
-- Supabase Realtime
-- GitHub Pages workflow
-- Layout responsive desktop, iPad e iPhone
-- Dashboard, sessioni, esercitazioni, libreria e partite già operative
+## Fase 1 — completata
+- React/Vite
+- Login Supabase
+- Archivio cloud condiviso
+- Realtime
+- Sessioni, esercitazioni, libreria e partite
+- Deploy GitHub Pages
 
-## Fase 2 — Parità completa con v23
-- Riunioni tecniche
-- Materiale didattico
-- Undo/redo persistente
-- Import/export cloud
-- Password e permessi sulle azioni sensibili
+## Fase 2A — completata in questa release
+- Struttura archivio versione 2 con normalizzazione e migrazione
+- Importazione/esportazione JSON
+- Migrazione automatica rilevabile dalla vecchia v23 locale
+- Undo/redo fino a 100 modifiche
+- Shortcut Command/Ctrl+Z e Command/Ctrl+Shift+Z
+- Password `vittoriout` per eliminazioni, importazione, migrazione e valutazioni
+- Registro audit delle ultime 200 operazioni
+- Eliminazione sessione con eliminazione esercitazioni collegate
 
-## Fase 3 — Storage e dati strutturati
-- Supabase Storage per immagini, loghi e documenti
-- Tabelle separate per sessioni, esercitazioni, partite e documenti
-- Migrazione dal blob JSON `app_state`
-
-## Fase 4 — Collaudo e rifinitura
-- Test Mac/iPad/iPhone
-- Gestione conflitti simultanei
-- Migrazione dati dalla v23
-- Backup e ripristino
+## Fase 2B — prossima
+- Riunioni tecniche e materiale didattico completi
+- Supabase Storage per immagini e documenti

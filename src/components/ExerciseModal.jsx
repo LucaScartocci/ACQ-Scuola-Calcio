@@ -13,7 +13,7 @@ export default function ExerciseModal({ session, initial, onSave, onClose }) {
     reader.readAsDataURL(file)
   }
   return <Modal title={initial ? 'MODIFICA ESERCITAZIONE' : 'NUOVA ESERCITAZIONE'} onClose={onClose} wide>
-    <form className="form-grid" onSubmit={e => { e.preventDefault(); onSave({ ...form, id: initial?.id || uid(), sessionId: session.id, category: session.category, title: upper(form.title), equipment: upper(form.equipment), objective: upper(form.objective), description: upper(form.description), createdAt: initial?.createdAt || Date.now() }) }}>
+    <form className="form-grid" onSubmit={e => { e.preventDefault(); onSave({ ...form, id: initial?.id || uid(), sessionId: session.id, category: session.category, title: upper(form.title), space: upper(form.space), equipment: upper(form.equipment), objective: upper(form.objective), description: upper(form.description), createdAt: initial?.createdAt || Date.now() }, initial) }}>
       <label className="full">TITOLO<input value={form.title} onChange={e => set('title', e.target.value)} required /></label>
       <label className="full">IMMAGINE<input type="file" accept="image/*" onChange={e => fileChange(e.target.files[0])} /></label>
       {form.image && <div className="image-preview full"><img src={form.image} /><button type="button" onClick={() => set('image', '')}>×</button></div>}
@@ -24,7 +24,7 @@ export default function ExerciseModal({ session, initial, onSave, onClose }) {
       <label className="full">MATERIALE<input value={form.equipment} onChange={e => set('equipment', e.target.value)} /></label>
       <label className="full">OBIETTIVO PRINCIPALE<textarea value={form.objective} onChange={e => set('objective', e.target.value)} /></label>
       <label className="full">ORGANIZZAZIONE E SVOLGIMENTO<textarea value={form.description} onChange={e => set('description', e.target.value)} /></label>
-      <label className="full">VALUTAZIONE<div className="stars">{[1,2,3,4,5].map(n => <button type="button" className={n <= form.rating ? 'active' : ''} onClick={() => set('rating', n)} key={n}>★</button>)}</div></label>
+      <label className="full">VALUTAZIONE<div className="stars">{[1,2,3,4,5].map(n => <button type="button" className={n <= form.rating ? 'active' : ''} onClick={() => set('rating', n)} key={n}>★</button>)}</div><small className="protected-note">LA MODIFICA DELLA VALUTAZIONE È PROTETTA DA PASSWORD.</small></label>
       <footer className="modal-actions full"><button type="button" className="ghost" onClick={onClose}>ANNULLA</button><button>SALVA ESERCITAZIONE</button></footer>
     </form>
   </Modal>
