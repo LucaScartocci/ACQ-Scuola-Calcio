@@ -4,7 +4,7 @@ export const COACHES = [
 ]
 export const CATEGORIES = ['PICCOLI AMICI','PRIMI CALCI','PULCINI','ESORDIENTI']
 export const PHASES = ['ATTIVAZIONE','PARTE CENTRALE','PARTITA A TEMA']
-export const ARCHIVE_VERSION = 5
+export const ARCHIVE_VERSION = 4
 export const ADMIN_PASSWORD = 'vittoriout'
 
 const safeId = prefix => {
@@ -41,7 +41,6 @@ export const emptyArchive = () => ({
   documents: { meetings: [], teaching: [] },
   players: DEMO_PLAYERS.map(player => ({...player})),
   attendanceBySession: {},
-  playerDocuments: {},
   audit: [],
   updatedAt: new Date().toISOString(),
 })
@@ -74,8 +73,6 @@ export const normalizeArchive = (value) => {
   const rawPlayers = Array.isArray(value.players) ? value.players : []
   const rawAttendance = value.attendanceBySession && typeof value.attendanceBySession === 'object'
     ? value.attendanceBySession : {}
-  const rawPlayerDocuments = value.playerDocuments && typeof value.playerDocuments === 'object'
-    ? value.playerDocuments : {}
 
   const archive = {
     version: ARCHIVE_VERSION,
@@ -135,20 +132,6 @@ export const normalizeArchive = (value) => {
           updatedAt: record?.updatedAt || new Date().toISOString(),
           updatedBy: upper(record?.updatedBy || ''),
         }
-      ])
-    ),
-    playerDocuments: Object.fromEntries(
-      Object.entries(rawPlayerDocuments).map(([playerId, documents]) => [
-        playerId,
-        Array.isArray(documents) ? documents.map(document => ({
-          ...document,
-          id: document.id || safeId('player-document'),
-          documentType: upper(document.documentType || 'ALTRO DOCUMENTO'),
-          title: upper(document.title || document.name || ''),
-          expiryDate: document.expiryDate || '',
-          uploadedAt: document.uploadedAt || new Date().toISOString(),
-          uploadedBy: upper(document.uploadedBy || ''),
-        })) : []
       ])
     ),
     audit: Array.isArray(value.audit) ? value.audit.slice(-200) : [],

@@ -1,52 +1,40 @@
-# ACQ Scuola Calcio · Fase 6A Area Segreteria
+# ACQ Scuola Calcio v24 Cloud · Fase 5D
 
-## Ruolo Segretario
+## Modifiche presenze
 
-Il Segretario ha una dashboard dedicata e non vede:
-- esercitazioni
-- libreria tecnica
-- valutazioni
-- backup
-- utenti
-- modifiche tecniche delle sedute
+- in ogni sessione è possibile selezionare giocatori di qualsiasi categoria
+- menu categoria preimpostato sulla categoria della seduta
+- opzione Tutte le categorie
+- ricerca per nome, cognome e categoria
+- Seleziona visibili e Azzera visibili
+- i giocatori già selezionati restano presenti anche cambiando filtro
+- riepilogo completo dei giocatori selezionati
+- categoria visibile accanto a ogni giocatore
 
-Vede:
-- sessioni di allenamento di tutte le categorie
-- numero presenti e gestione presenze
-- calendari partite aggiornati dagli allenatori
-- statistiche presenze individuali e per categoria
+## Modifiche PDF
 
-## Tre pulsanti dedicati
-
-### Tesserati
-- ricerca e filtro categoria
-- documenti collegati al singolo tesserato
-- Tesseramento
-- Certificato medico
-- Nulla osta
-- Altro documento
-- data di scadenza
-- stato valido, in scadenza o scaduto
-- apertura ed eliminazione file
-
-### Calendari partite
-- tutte le categorie
-- data, ora, avversario e campo
-- numero convocati
-- aggiornamento automatico dai calendari degli allenatori
-
-### Presenze
-- classifica individuale
-- percentuale
-- minuti
-- ultima presenza
-- filtri ed esportazione CSV
+- PDF ridotto a massimo 2 pagine
+- pagina 1:
+  - dati della seduta
+  - obiettivo
+  - numero presenti
+  - elenco presenze diviso per categoria
+  - riepilogo minuti ed esercitazioni
+- pagina 2:
+  - esercitazioni in formato compatto
+  - immagine, titolo, fase, durata, giocatori, spazio e obiettivo
+  - QR Code per ogni esercitazione
+- massimo 6 esercitazioni mostrate nella seconda pagina
+- eventuali esercitazioni aggiuntive vengono segnalate senza creare altre pagine
 
 ## Installazione
 
-1. Eseguire `supabase_phase6a.sql` in Supabase SQL Editor.
-2. Attendere `Success`.
-3. Caricare tutti i file su GitHub.
-4. Attendere il deploy verde.
-5. Creare l'utente in Authentication.
-6. Dal pannello Utenti assegnare il ruolo `SEGRETARIO`.
+Non servono nuove query SQL.
+
+1. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
+2. Conservare `.github`.
+3. Attendere il deploy verde.
+4. Aggiornare forzatamente il browser o riaprire la PWA.
+5. Aprire una sessione → `+ PRESENZE`.
+6. Selezionare giocatori anche da categorie diverse.
+7. Premere `APRI` per controllare il PDF di 2 pagine.
