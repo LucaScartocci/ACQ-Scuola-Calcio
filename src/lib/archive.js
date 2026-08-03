@@ -19,13 +19,27 @@ const emptyMatch = (slot) => ({
   location: '', coach: '', callupPlayers: '', logoPath: '', competition: 'CAMPIONATO', meetingTime: '', meetingPlace: '', callupNotes: ''
 })
 
+
+const DEMO_PLAYERS = [
+  { id:'demo-pa-01', firstName:'MATTEO', lastName:'ROSSI', category:'PICCOLI AMICI', shirtNumber:4, active:true, createdAt:Date.now() },
+  { id:'demo-pa-02', firstName:'LUCA', lastName:'BIANCHI', category:'PICCOLI AMICI', shirtNumber:7, active:true, createdAt:Date.now() },
+  { id:'demo-pa-03', firstName:'TOMMASO', lastName:'ESPOSITO', category:'PICCOLI AMICI', shirtNumber:8, active:true, createdAt:Date.now() },
+  { id:'demo-pa-04', firstName:'LEONARDO', lastName:'RICCI', category:'PICCOLI AMICI', shirtNumber:9, active:true, createdAt:Date.now() },
+  { id:'demo-pa-05', firstName:'DIEGO', lastName:'ROMANO', category:'PICCOLI AMICI', shirtNumber:10, active:true, createdAt:Date.now() },
+  { id:'demo-pa-06', firstName:'ALESSANDRO', lastName:'FERRARI', category:'PICCOLI AMICI', shirtNumber:11, active:true, createdAt:Date.now() },
+  { id:'demo-pa-07', firstName:'NICOLÒ', lastName:'GALLO', category:'PICCOLI AMICI', shirtNumber:13, active:true, createdAt:Date.now() },
+  { id:'demo-pa-08', firstName:'SAMUELE', lastName:'CONTI', category:'PICCOLI AMICI', shirtNumber:14, active:true, createdAt:Date.now() },
+  { id:'demo-pa-09', firstName:'GABRIELE', lastName:'MORETTI', category:'PICCOLI AMICI', shirtNumber:15, active:true, createdAt:Date.now() },
+  { id:'demo-pa-10', firstName:'RICCARDO', lastName:'GRECO', category:'PICCOLI AMICI', shirtNumber:18, active:true, createdAt:Date.now() },
+]
+
 export const emptyArchive = () => ({
   version: ARCHIVE_VERSION,
   sessions: [],
   exercises: [],
   matchesByCategory: Object.fromEntries(CATEGORIES.map(c => [c, Array.from({ length: 30 }, (_, i) => emptyMatch(i + 1))])),
   documents: { meetings: [], teaching: [] },
-  players: [],
+  players: DEMO_PLAYERS.map(player => ({...player})),
   attendanceBySession: {},
   audit: [],
   updatedAt: new Date().toISOString(),
@@ -93,16 +107,21 @@ export const normalizeArchive = (value) => {
       meetings: Array.isArray(rawDocuments.meetings) ? rawDocuments.meetings.map(normalizeDocument) : [],
       teaching: Array.isArray(rawDocuments.teaching) ? rawDocuments.teaching.map(normalizeDocument) : [],
     },
-    players: rawPlayers.map(player => ({
-      ...player,
-      id: player.id || safeId('player'),
-      firstName: upper(player.firstName || player.name || ''),
-      lastName: upper(player.lastName || player.surname || ''),
-      category: normalizeCategory(player.category),
-      shirtNumber: player.shirtNumber === '' || player.shirtNumber == null ? '' : Number(player.shirtNumber),
-      active: player.active !== false,
-      createdAt: Number(player.createdAt) || Date.now(),
-    })),
+    players: (() => {
+      const normalized = rawPlayers.map(player => ({
+        ...player,
+        id: player.id || safeId('player'),
+        firstName: upper(player.firstName || player.name || ''),
+        lastName: upper(player.lastName || player.surname || ''),
+        category: normalizeCategory(player.category),
+        shirtNumber: player.shirtNumber === '' || player.shirtNumber == null ? '' : Number(player.shirtNumber),
+        active: player.active !== false,
+        createdAt: Number(player.createdAt) || Date.now(),
+      }))
+      const existingIds = new Set(normalized.map(player => player.id))
+      const missingDemo = DEMO_PLAYERS.filter(player => !existingIds.has(player.id))
+      return [...normalized, ...missingDemo.map(player => ({...player}))]
+    })(),
     attendanceBySession: Object.fromEntries(
       Object.entries(rawAttendance).map(([sessionId, record]) => [
         sessionId,

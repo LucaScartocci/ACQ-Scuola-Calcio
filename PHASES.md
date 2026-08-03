@@ -1,6 +1,6 @@
 # Stato progetto
 
-- Fase 4: PDF e rifiniture UI
-- Fase 5A: anagrafica tesserati, presenze e statistiche individuali
+- Fase 5A: tesserati, presenze e statistiche individuali
+- Fase 5B: dati demo e rifinitura simmetrica dell'header
 
-Il prossimo lavoro consigliato è esclusivamente collaudo e correzione di eventuali dettagli.
+Prossimo passo: collaudo del sistema presenze e rifiniture finali.
