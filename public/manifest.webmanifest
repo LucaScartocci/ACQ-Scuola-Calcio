@@ -1,0 +1,25 @@
+{
+  "name": "Scuola Calcio Acquacetosa",
+  "short_name": "ACQ Training",
+  "description": "Archivio metodologico condiviso della Scuola Calcio Acquacetosa",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#071b34",
+  "theme_color": "#071b34",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

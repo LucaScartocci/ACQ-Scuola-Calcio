@@ -1,7 +1,9 @@
-# Fasi v24 Cloud
+# Stato progetto
 
-- Fase 1: React, login, Supabase Realtime, dashboard
-- Fase 2A: backup, import/export, undo/redo, protezioni
-- Fase 2B: riunioni tecniche, materiale didattico, Supabase Storage
-- Fase 2C: calendario partite, loghi cloud, convocazioni e PNG avanzato
-- Fase 2D: migrazione finale, mobile/iPad, collaudo e rifiniture
+- Fase 1: React, Supabase Auth, Cloud e Realtime
+- Fase 2A: backup, importazione, undo/redo e protezioni
+- Fase 2B: riunioni, materiale didattico e Supabase Storage
+- Fase 2C: partite, loghi cloud, convocazioni e PNG
+- Fase 2D: PWA installabile, modalità offline, filtri correlati, cronologia e rifinitura iPad/iPhone
+
+Prossimo blocco consigliato: Fase 3, utenti e ruoli.

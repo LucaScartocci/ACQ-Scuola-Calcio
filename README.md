@@ -1,29 +1,28 @@
-# ACQ Scuola Calcio v24 Cloud · Fase 2C
+# ACQ Scuola Calcio v24 Cloud · Fase 2D
 
-Questa release aggiunge il blocco **Partite e Convocazioni**.
+Questa release completa la Fase 2.
 
 ## Novità
 
-- 30 partite preimpostate per ogni categoria.
-- Ordinamento automatico dalla gara più vicina alla più lontana.
-- Nome avversario, data, orario e luogo modificabili.
-- Logo avversario salvato su Supabase Storage e visibile su ogni dispositivo.
-- Pulsante per eliminare il logo caricato.
-- Pulsante Convocazione per ogni partita.
-- Salvataggio condiviso di allenatore, ritrovo, luogo ritrovo, convocati e note.
-- Esportazione PNG 1080×1350 con:
-  - categoria dinamica;
-  - stagione 2026/27 ben visibile;
-  - loghi delle squadre;
-  - data, ora, luogo e allenatore;
-  - lista convocati in tre colonne.
-- Pulsante Azzera per ripulire una singola partita.
+- PWA installabile su iPad, iPhone, Android e computer
+- manifest, icone e service worker
+- apertura offline dell'app
+- copia locale automatica dell'ultimo archivio cloud
+- modifiche offline salvate localmente e inviate al ritorno della connessione
+- filtri correlati tra allenatore, categoria, fase, stelle e ricerca
+- filtro allenatore funzionante anche nella Libreria Esercitazioni
+- pulsante Azzera filtri
+- cronologia operazioni consultabile
+- layout ottimizzato per iPad verticale/orizzontale e iPhone
+- stati vuoti più chiari
+- controllo automatico della vista Partite quando viene rimossa la categoria
 
 ## Aggiornamento
 
-1. Eseguire prima il setup Storage della Fase 2B, se non è stato ancora fatto.
-2. Caricare tutti i file di questo pacchetto nel repository GitHub, sovrascrivendo quelli esistenti.
-3. Fare Commit changes.
-4. Attendere il deploy verde nella scheda Actions.
+Caricare tutti i file sul repository GitHub sostituendo quelli esistenti.
+Non servono nuove query SQL rispetto alla Fase 2B.
 
-Non sono necessarie nuove query SQL rispetto alla Fase 2B.
+Dopo il deploy, su iPad/iPhone:
+Safari → Condividi → Aggiungi alla schermata Home.
+
+Nota offline: l'app può aprirsi e conservare modifiche temporanee senza rete. Immagini e documenti nuovi richiedono comunque una connessione per essere caricati su Supabase Storage.
