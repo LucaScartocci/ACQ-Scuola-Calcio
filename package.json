@@ -1,7 +1,7 @@
 {
   "name": "acq-scuola-calcio-v24-cloud",
   "private": true,
-  "version": "3.2.0-phase3c",
+  "version": "3.3.0-phase3d",
   "type": "module",
   "scripts": {
     "dev": "vite",

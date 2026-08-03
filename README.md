@@ -1,29 +1,30 @@
-# ACQ Scuola Calcio v24 Cloud · Fase 3C
+# ACQ Scuola Calcio v24 Cloud · Fase 3D
 
 ## Novità
 
-- dashboard statistiche integrata
-- KPI su sessioni, esercitazioni, minuti, valutazioni, allenatori e partite
-- attività per categoria
-- utilizzo per allenatore
-- distribuzione delle fasi
-- distribuzione delle valutazioni
-- ultime sessioni
-- prossime partite
-- esercitazioni in evidenza
-- indicatori di completezza dell'archivio
-- esportazione CSV delle statistiche
-- dati limitati automaticamente alle categorie visibili dal profilo utente
-- correzione del collegamento alla Cronologia avanzata della Fase 3B
+- Centro Notifiche condiviso
+- badge con numero di notifiche non lette
+- aggiornamento Realtime
+- stato letto/non letto separato per ogni utente
+- filtro per tipo e ricerca testuale
+- modalità Solo da leggere
+- Segna letta e Segna tutte lette
+- notifiche automatiche generate dalla Cronologia permanente
+- notifiche per sessioni, esercitazioni, partite, documenti, backup e utenti
+- priorità Importante per eliminazioni e ripristini archivio
+- visibilità basata su ruolo e categorie assegnate
+- Direttore e Coordinatore vedono il quadro completo
+- Allenatori e Collaboratori vedono le attività pertinenti alle proprie categorie
 
 ## Installazione
 
-Questa fase non richiede nuove query SQL.
+1. Aprire `supabase_phase3d.sql`.
+2. Supabase → SQL Editor → New query.
+3. Incollare tutto e premere Run.
+4. Attendere il messaggio Success.
+5. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
+6. Attendere il deploy verde.
+7. Fare logout e login.
+8. Aprire il nuovo pulsante `NOTIFICHE`.
 
-1. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
-2. Conservare la cartella `.github`.
-3. Attendere il deploy verde.
-4. Aggiornare forzatamente la pagina o riaprire la PWA.
-5. Premere il nuovo pulsante `STATISTICHE`.
-
-Le query SQL delle Fasi 3A e 3B devono essere già state eseguite.
+Le query delle Fasi 3A e 3B devono essere già state eseguite.

@@ -13,6 +13,7 @@ import Modal from './components/Modal'
 import UserManagement from './components/UserManagement'
 import AuditCenter from './components/AuditCenter'
 import StatisticsDashboard from './components/StatisticsDashboard'
+import NotificationCenter from './components/NotificationCenter'
 import { removeCloudFile, uploadCloudFile } from './lib/storage'
 import './styles.css'
 
@@ -42,6 +43,10 @@ export default function App() {
   const [profileLoading, setProfileLoading] = useState(false)
   const [usersOpen, setUsersOpen] = useState(false)
   const [statisticsOpen, setStatisticsOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notifications, setNotifications] = useState([])
+  const [notificationReadIds, setNotificationReadIds] = useState(new Set())
+  const [notificationsLoading, setNotificationsLoading] = useState(false)
   const saveTimer = useRef(null)
   const applyingRemote = useRef(false)
   const undoStack = useRef([])
@@ -127,6 +132,132 @@ export default function App() {
     if (auth?.user) loadProfile()
     else setProfile(null)
   }, [auth?.user?.id])
+
+  const unreadNotifications = useMemo(
+    () => notifications.filter(item => !notificationReadIds.has(item.id)).length,
+    [notifications, notificationReadIds]
+  )
+
+  const loadNotifications = useCallback(async () => {
+    if (!auth?.user || !profile) return
+    setNotificationsLoading(true)
+
+    const [{ data: notificationData, error: notificationError }, { data: readData, error: readError }] =
+      await Promise.all([
+        supabase
+          .from('notifications')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(300),
+        supabase
+          .from('notification_reads')
+          .select('notification_id')
+          .eq('user_id', auth.user.id),
+      ])
+
+    if (notificationError) {
+      console.error('NOTIFICATIONS LOAD ERROR', notificationError)
+      setNotifications([])
+    } else {
+      setNotifications(notificationData || [])
+    }
+
+    if (readError) {
+      console.error('NOTIFICATION READS LOAD ERROR', readError)
+    } else {
+      setNotificationReadIds(new Set((readData || []).map(item => item.notification_id)))
+    }
+
+    setNotificationsLoading(false)
+  }, [auth?.user?.id, profile])
+
+  const markNotificationRead = useCallback(async notificationId => {
+    if (!auth?.user || !notificationId) return
+
+    setNotificationReadIds(current => {
+      const next = new Set(current)
+      next.add(notificationId)
+      return next
+    })
+
+    const { error } = await supabase.from('notification_reads').upsert(
+      {
+        notification_id: notificationId,
+        user_id: auth.user.id,
+        read_at: new Date().toISOString(),
+      },
+      { onConflict:'notification_id,user_id' }
+    )
+
+    if (error) {
+      console.error('MARK NOTIFICATION READ ERROR', error)
+      loadNotifications()
+    }
+  }, [auth?.user?.id, loadNotifications])
+
+  const markAllNotificationsRead = useCallback(async () => {
+    if (!auth?.user) return
+    const unread = notifications.filter(item => !notificationReadIds.has(item.id))
+    if (!unread.length) return
+
+    setNotificationReadIds(new Set(notifications.map(item => item.id)))
+
+    const rows = unread.map(item => ({
+      notification_id: item.id,
+      user_id: auth.user.id,
+      read_at: new Date().toISOString(),
+    }))
+
+    const { error } = await supabase
+      .from('notification_reads')
+      .upsert(rows, { onConflict:'notification_id,user_id' })
+
+    if (error) {
+      console.error('MARK ALL NOTIFICATIONS READ ERROR', error)
+      loadNotifications()
+    }
+  }, [auth?.user?.id, notifications, notificationReadIds, loadNotifications])
+
+  useEffect(() => {
+    if (!auth?.user || !profile) return
+
+    loadNotifications()
+
+    const channel = supabase
+      .channel(`acq-notifications-${auth.user.id}`)
+      .on(
+        'postgres_changes',
+        { event:'INSERT', schema:'public', table:'notifications' },
+        payload => {
+          if (!payload.new) return
+          setNotifications(current => {
+            if (current.some(item => item.id === payload.new.id)) return current
+            return [payload.new, ...current].slice(0,300)
+          })
+          showToast('NUOVA NOTIFICA')
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event:'INSERT',
+          schema:'public',
+          table:'notification_reads',
+          filter:`user_id=eq.${auth.user.id}`,
+        },
+        payload => {
+          if (!payload.new?.notification_id) return
+          setNotificationReadIds(current => {
+            const next = new Set(current)
+            next.add(payload.new.notification_id)
+            return next
+          })
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [auth?.user?.id, profile?.id, loadNotifications, showToast])
 
   useEffect(() => {
     if (!auth) return
@@ -532,7 +663,11 @@ export default function App() {
   if(profile.active === false) return <div className="fatal-error"><h1>ACCOUNT SOSPESO</h1><p>CONTATTA IL DIRETTORE TECNICO.</p><button onClick={()=>supabase.auth.signOut()}>ESCI</button></div>
 
   return <div className="app-shell">
-    <header className="hero"><div><small>ARCHIVIO METODOLOGICO ACQUACETOSA</small><h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1></div><img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`}/><b>2026/27</b><nav>{canWrite && <button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button>}<button onClick={()=>setDocumentModal('meetings')}>RIUNIONI TECNICHE</button><button onClick={()=>setDocumentModal('teaching')}>MATERIALE DIDATTICO</button><button className="glass" onClick={exportArchive}>ESPORTA</button><button className="glass" onClick={()=>fileInput.current?.click()}>IMPORTA</button>{legacyArchive && <button className="glass" onClick={migrateLegacy}>MIGRA V23</button>}<button className="glass" onClick={()=>setStatisticsOpen(true)}>STATISTICHE</button><button className="glass" onClick={installApp}>INSTALLA APP</button>{canManageUsers && <button className="glass" onClick={()=>setUsersOpen(true)}>UTENTI</button>}<button className="glass" onClick={()=>supabase.auth.signOut()}>ESCI</button><input ref={fileInput} hidden type="file" accept="application/json,.json" onChange={e=>importArchive(e.target.files?.[0])}/></nav></header>
+    <header className="hero"><div><small>ARCHIVIO METODOLOGICO ACQUACETOSA</small><h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1></div><img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`}/><b>2026/27</b><nav>{canWrite && <button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button>}<button onClick={()=>setDocumentModal('meetings')}>RIUNIONI TECNICHE</button><button onClick={()=>setDocumentModal('teaching')}>MATERIALE DIDATTICO</button><button className="glass" onClick={exportArchive}>ESPORTA</button><button className="glass" onClick={()=>fileInput.current?.click()}>IMPORTA</button>{legacyArchive && <button className="glass" onClick={migrateLegacy}>MIGRA V23</button>}<button className="glass notification-trigger" onClick={()=>setNotificationsOpen(true)}>
+      NOTIFICHE
+      {unreadNotifications > 0 && <span>{unreadNotifications > 99 ? '99+' : unreadNotifications}</span>}
+    </button>
+    <button className="glass" onClick={()=>setStatisticsOpen(true)}>STATISTICHE</button><button className="glass" onClick={installApp}>INSTALLA APP</button>{canManageUsers && <button className="glass" onClick={()=>setUsersOpen(true)}>UTENTI</button>}<button className="glass" onClick={()=>supabase.auth.signOut()}>ESCI</button><input ref={fileInput} hidden type="file" accept="application/json,.json" onChange={e=>importArchive(e.target.files?.[0])}/></nav></header>
     <section className="profile-bar">
       <div className="profile-avatar">{(profile.first_name?.[0] || auth.user.email?.[0] || 'U')}{profile.last_name?.[0] || ''}</div>
       <div><b>{upper([profile.first_name,profile.last_name].filter(Boolean).join(' ') || auth.user.email)}</b><span>{upper(profile.role)}{profile.coach_name ? ` · ${profile.coach_name}` : ''}</span></div>
@@ -545,11 +680,21 @@ export default function App() {
     {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}'</p></div><div>{canWrite && <button onClick={()=>openNewExercise(s)}>＋ ESERCITAZIONE</button>}{canWrite && <button className="soft" onClick={()=>setSessionModal(s)}>MODIFICA</button>}{canDelete && <button className="soft" onClick={()=>deleteSession(s.id)}>ELIMINA</button>}</div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
     {view==='library' && <main><div className="section-title"><div><h2>LIBRERIA ESERCITAZIONI</h2><p>TUTTE LE ESERCITAZIONI DELL’ARCHIVIO.</p></div><b>{filteredExercises.length} ESERCITAZIONI</b></div>{!filteredExercises.length && <EmptyState title="NESSUNA ESERCITAZIONE TROVATA" text="MODIFICA I FILTRI O AGGIUNGI UNA ESERCITAZIONE."/>}<div className="exercise-grid library">{filteredExercises.map(e=>{const s=archive.sessions.find(x=>x.id===e.sessionId);return <ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>s&&setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>})}</div></main>}
     {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} readOnly={!canWrite} onChange={items=>{if(!canWrite)return;commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory, { objectType:'CALENDARIO PARTITE', category:selectedCategory })}}/></main>}
-    <div className="build-badge">FASE 3C</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
+    <div className="build-badge">FASE 3D</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
     {toast && <div className="action-toast">{toast}</div>}
     {auditOpen && <AuditModal items={archive.audit||[]} onClose={()=>setAuditOpen(false)}/>}
     {sessionModal && <SessionModal initial={sessionModal.id?sessionModal:null} allowedCategories={visibleCategories} fixedCoach={isCoach?profileCoach:''} canChooseCoach={!isCoach} onSave={saveSession} onClose={()=>setSessionModal(null)}/>} 
     {exerciseModal && <ExerciseModal session={exerciseModal.session} initial={exerciseModal.initial} onSave={saveExercise} onClose={()=>setExerciseModal(null)}/>} 
+    {notificationsOpen && <NotificationCenter
+      profile={profile}
+      notifications={notifications}
+      readIds={notificationReadIds}
+      loading={notificationsLoading}
+      onMarkRead={markNotificationRead}
+      onMarkAllRead={markAllNotificationsRead}
+      onRefresh={loadNotifications}
+      onClose={()=>setNotificationsOpen(false)}
+    />}
     {statisticsOpen && <StatisticsDashboard archive={archive} visibleCategories={visibleCategories} profile={profile} onClose={()=>setStatisticsOpen(false)}/>} 
     {usersOpen && <UserManagement currentProfile={profile} onChanged={loadProfile} onClose={()=>setUsersOpen(false)}/>}
     {documentModal && <DocumentLibrary type={documentModal} items={archive.documents[documentModal]||[]} readOnly={!canWrite} onAdd={items=>addDocuments(documentModal,items)} onDelete={item=>deleteDocument(documentModal,item)} onClose={()=>setDocumentModal(null)}/>} 

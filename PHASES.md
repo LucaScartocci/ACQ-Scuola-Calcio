@@ -7,6 +7,7 @@
 - Fase 2D: PWA, offline e dispositivi
 - Fase 3A: utenti, ruoli e permessi
 - Fase 3B: audit log permanente e CSV
-- Fase 3C: dashboard statistiche e analisi utilizzo
+- Fase 3C: dashboard statistiche
+- Fase 3D: centro notifiche e attività recenti
 
-Prossimo blocco: Fase 3D, centro notifiche e attività recenti.
+Prossimo blocco consigliato: Fase 3E, backup automatici e ripristino versioni.
