@@ -1,30 +1,23 @@
-# ACQ Scuola Calcio v24 Cloud · Fase 3D
+# ACQ Scuola Calcio v24 Cloud · Fase 3E
 
 ## Novità
 
-- Centro Notifiche condiviso
-- badge con numero di notifiche non lette
-- aggiornamento Realtime
-- stato letto/non letto separato per ogni utente
-- filtro per tipo e ricerca testuale
-- modalità Solo da leggere
-- Segna letta e Segna tutte lette
-- notifiche automatiche generate dalla Cronologia permanente
-- notifiche per sessioni, esercitazioni, partite, documenti, backup e utenti
-- priorità Importante per eliminazioni e ripristini archivio
-- visibilità basata su ruolo e categorie assegnate
-- Direttore e Coordinatore vedono il quadro completo
-- Allenatori e Collaboratori vedono le attività pertinenti alle proprie categorie
+- Centro Backup e Ripristino
+- backup automatico ogni 6 ore in presenza di modifiche
+- backup manuale con un clic
+- backup di sicurezza prima di ogni ripristino
+- download dei singoli backup in JSON
+- elenco versioni con data, autore, dimensione e contenuti
+- ricerca e filtro per tipo
+- ripristino ed eliminazione protetti da password
+- conservazione automatica dei backup automatici per 30 giorni
+- Realtime sull’elenco backup
 
 ## Installazione
 
-1. Aprire `supabase_phase3d.sql`.
-2. Supabase → SQL Editor → New query.
-3. Incollare tutto e premere Run.
-4. Attendere il messaggio Success.
-5. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
-6. Attendere il deploy verde.
-7. Fare logout e login.
-8. Aprire il nuovo pulsante `NOTIFICHE`.
-
-Le query delle Fasi 3A e 3B devono essere già state eseguite.
+1. Eseguire `supabase_phase3e.sql` in Supabase → SQL Editor.
+2. Attendere `Success`.
+3. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
+4. Attendere il deploy verde.
+5. Fare logout e login.
+6. Aprire il pulsante `BACKUP`.

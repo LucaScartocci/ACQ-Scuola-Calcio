@@ -14,6 +14,7 @@ import UserManagement from './components/UserManagement'
 import AuditCenter from './components/AuditCenter'
 import StatisticsDashboard from './components/StatisticsDashboard'
 import NotificationCenter from './components/NotificationCenter'
+import BackupCenter from './components/BackupCenter'
 import { removeCloudFile, uploadCloudFile } from './lib/storage'
 import './styles.css'
 
@@ -47,6 +48,7 @@ export default function App() {
   const [notifications, setNotifications] = useState([])
   const [notificationReadIds, setNotificationReadIds] = useState(new Set())
   const [notificationsLoading, setNotificationsLoading] = useState(false)
+  const [backupsOpen, setBackupsOpen] = useState(false)
   const saveTimer = useRef(null)
   const applyingRemote = useRef(false)
   const undoStack = useRef([])
@@ -497,6 +499,33 @@ export default function App() {
     return normalized
   }
 
+  async function restoreArchiveFromBackup(nextArchive, backupItem) {
+    if (!canDelete) throw new Error('PERMESSO NEGATO')
+
+    const currentSnapshot = normalizeArchive({...archive,updatedAt:new Date().toISOString()})
+    const currentJson = JSON.stringify(currentSnapshot)
+    const { error: preBackupError } = await supabase.from('archive_backups').insert({
+      backup_type:'pre_restore',
+      label:`PRIMA DEL RIPRISTINO · ${new Date().toLocaleString('it-IT')}`,
+      archive_data:currentSnapshot,
+      archive_size:new Blob([currentJson]).size,
+      created_by:auth.user.id,
+      created_by_email:auth.user.email || '',
+      created_by_name:upper([profile.first_name,profile.last_name].filter(Boolean).join(' ') || auth.user.email || ''),
+      created_at:new Date().toISOString(),
+    })
+    if (preBackupError) throw new Error('IMPOSSIBILE CREARE IL BACKUP DI SICUREZZA')
+
+    const normalized = normalizeArchive(nextArchive)
+    await persistArchiveImmediately(normalized, 'ARCHIVIO RIPRISTINATO')
+    await writeAuditLog('RIPRISTINA BACKUP', backupItem?.label || 'BACKUP ARCHIVIO', {
+      objectType:'BACKUP',
+      objectId:String(backupItem?.id || ''),
+      metadata:{backupCreatedAt:backupItem?.created_at || ''}
+    })
+    showToast('ARCHIVIO RIPRISTINATO')
+  }
+
   function openNewExercise(session) {
     if (!session || !session.id) {
       showToast('SESSIONE NON ANCORA DISPONIBILE. ATTENDI UN ISTANTE E RIPROVA.')
@@ -663,7 +692,7 @@ export default function App() {
   if(profile.active === false) return <div className="fatal-error"><h1>ACCOUNT SOSPESO</h1><p>CONTATTA IL DIRETTORE TECNICO.</p><button onClick={()=>supabase.auth.signOut()}>ESCI</button></div>
 
   return <div className="app-shell">
-    <header className="hero"><div><small>ARCHIVIO METODOLOGICO ACQUACETOSA</small><h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1></div><img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`}/><b>2026/27</b><nav>{canWrite && <button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button>}<button onClick={()=>setDocumentModal('meetings')}>RIUNIONI TECNICHE</button><button onClick={()=>setDocumentModal('teaching')}>MATERIALE DIDATTICO</button><button className="glass" onClick={exportArchive}>ESPORTA</button><button className="glass" onClick={()=>fileInput.current?.click()}>IMPORTA</button>{legacyArchive && <button className="glass" onClick={migrateLegacy}>MIGRA V23</button>}<button className="glass notification-trigger" onClick={()=>setNotificationsOpen(true)}>
+    <header className="hero"><div><small>ARCHIVIO METODOLOGICO ACQUACETOSA</small><h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1></div><img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`}/><b>2026/27</b><nav>{canWrite && <button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button>}<button onClick={()=>setDocumentModal('meetings')}>RIUNIONI TECNICHE</button><button onClick={()=>setDocumentModal('teaching')}>MATERIALE DIDATTICO</button><button className="glass" onClick={exportArchive}>ESPORTA</button><button className="glass" onClick={()=>fileInput.current?.click()}>IMPORTA</button>{legacyArchive && <button className="glass" onClick={migrateLegacy}>MIGRA V23</button>}<button className="glass" onClick={()=>setBackupsOpen(true)}>BACKUP</button><button className="glass notification-trigger" onClick={()=>setNotificationsOpen(true)}>
       NOTIFICHE
       {unreadNotifications > 0 && <span>{unreadNotifications > 99 ? '99+' : unreadNotifications}</span>}
     </button>
@@ -680,11 +709,12 @@ export default function App() {
     {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}'</p></div><div>{canWrite && <button onClick={()=>openNewExercise(s)}>＋ ESERCITAZIONE</button>}{canWrite && <button className="soft" onClick={()=>setSessionModal(s)}>MODIFICA</button>}{canDelete && <button className="soft" onClick={()=>deleteSession(s.id)}>ELIMINA</button>}</div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
     {view==='library' && <main><div className="section-title"><div><h2>LIBRERIA ESERCITAZIONI</h2><p>TUTTE LE ESERCITAZIONI DELL’ARCHIVIO.</p></div><b>{filteredExercises.length} ESERCITAZIONI</b></div>{!filteredExercises.length && <EmptyState title="NESSUNA ESERCITAZIONE TROVATA" text="MODIFICA I FILTRI O AGGIUNGI UNA ESERCITAZIONE."/>}<div className="exercise-grid library">{filteredExercises.map(e=>{const s=archive.sessions.find(x=>x.id===e.sessionId);return <ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>s&&setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>})}</div></main>}
     {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} readOnly={!canWrite} onChange={items=>{if(!canWrite)return;commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory, { objectType:'CALENDARIO PARTITE', category:selectedCategory })}}/></main>}
-    <div className="build-badge">FASE 3D</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
+    <div className="build-badge">FASE 3E</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
     {toast && <div className="action-toast">{toast}</div>}
     {auditOpen && <AuditModal items={archive.audit||[]} onClose={()=>setAuditOpen(false)}/>}
     {sessionModal && <SessionModal initial={sessionModal.id?sessionModal:null} allowedCategories={visibleCategories} fixedCoach={isCoach?profileCoach:''} canChooseCoach={!isCoach} onSave={saveSession} onClose={()=>setSessionModal(null)}/>} 
     {exerciseModal && <ExerciseModal session={exerciseModal.session} initial={exerciseModal.initial} onSave={saveExercise} onClose={()=>setExerciseModal(null)}/>} 
+    {backupsOpen && <BackupCenter archive={archive} profile={profile} canRestore={canDelete} onRestore={restoreArchiveFromBackup} onClose={()=>setBackupsOpen(false)}/>}
     {notificationsOpen && <NotificationCenter
       profile={profile}
       notifications={notifications}
