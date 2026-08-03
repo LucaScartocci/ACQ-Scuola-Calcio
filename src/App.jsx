@@ -332,7 +332,6 @@ export default function App() {
         localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(next))
         applyingRemote.current = false
         setStatus('ARCHIVIO SINCRONIZZATO')
-        showToast('AGGIORNATO DA ALTRO DISPOSITIVO')
       }).subscribe()
     }
     start()

@@ -1,3 +1,3 @@
-# Fase 6J
+# Fase 6K
 
-Salvataggio atomico dei documenti e audit interno dei principali conflitti di sincronizzazione.
+Sincronizzazione Realtime completamente silenziosa.
