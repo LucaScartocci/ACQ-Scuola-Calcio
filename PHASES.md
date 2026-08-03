@@ -4,7 +4,8 @@
 - Fase 2A: backup, import, undo/redo e protezioni
 - Fase 2B: documenti e Storage
 - Fase 2C: partite e convocazioni
-- Fase 2D: PWA, offline e ottimizzazione dispositivi
-- Fase 3A: utenti, ruoli, categorie assegnate e permessi
+- Fase 2D: PWA, offline e dispositivi
+- Fase 3A: utenti, ruoli e permessi
+- Fase 3B: audit log permanente, filtri e CSV
 
-Prossimo blocco: Fase 3B, audit avanzato e storico modifiche.
+Prossimo blocco: Fase 3C, dashboard statistiche e analisi utilizzo.

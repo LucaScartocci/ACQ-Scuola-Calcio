@@ -11,6 +11,7 @@ import Matches from './components/Matches'
 import DocumentLibrary from './components/DocumentLibrary'
 import Modal from './components/Modal'
 import UserManagement from './components/UserManagement'
+import AuditCenter from './components/AuditCenter'
 import { removeCloudFile, uploadCloudFile } from './lib/storage'
 import './styles.css'
 
@@ -45,6 +46,7 @@ export default function App() {
   const redoStack = useRef([])
   const fileInput = useRef(null)
   const legacyArchive = useMemo(() => readLegacyArchive(), [])
+  const loginAuditWritten = useRef('')
 
   const showToast = useCallback(message => {
     setToast(message)
@@ -125,6 +127,16 @@ export default function App() {
   }, [auth?.user?.id])
 
   useEffect(() => {
+    if (!auth?.user || !profile || loginAuditWritten.current === auth.user.id) return
+    loginAuditWritten.current = auth.user.id
+    writeAuditLog('ACCESSO', 'ACCESSO AL GESTIONALE', {
+      objectType:'SESSIONE UTENTE',
+      objectId:auth.user.id,
+      metadata:{ role:profile.role }
+    })
+  }, [auth?.user?.id, profile, writeAuditLog])
+
+  useEffect(() => {
     if (!auth) return
     let channel
     async function start() {
@@ -193,7 +205,34 @@ export default function App() {
     return () => window.clearTimeout(timer)
   }, [isOnline, auth, hydrated])
 
-  const commit = useCallback((updater, action = 'MODIFICA ARCHIVIO', details = '') => {
+  const writeAuditLog = useCallback(async (action, details = '', context = {}) => {
+    if (!auth?.user || !profile) return
+    const payload = {
+      action: upper(action || 'OPERAZIONE'),
+      details: upper(details || ''),
+      category: upper(context.category || ''),
+      object_type: upper(context.objectType || ''),
+      object_id: String(context.objectId || ''),
+      user_id: auth.user.id,
+      user_email: auth.user.email || '',
+      user_name: upper([profile.first_name,profile.last_name].filter(Boolean).join(' ') || auth.user.email || ''),
+      user_role: profile.role || '',
+      device: upper([
+        navigator.platform || '',
+        /iPad|iPhone|iPod/.test(navigator.userAgent) ? 'IOS' : '',
+        window.matchMedia('(display-mode: standalone)').matches ? 'APP' : 'BROWSER'
+      ].filter(Boolean).join(' · ')),
+      metadata: context.metadata || {},
+      created_at: new Date().toISOString(),
+    }
+
+    if (!navigator.onLine) return
+
+    const { error } = await supabase.from('audit_logs').insert(payload)
+    if (error) console.error('AUDIT LOG ERROR', error)
+  }, [auth, profile])
+
+  const commit = useCallback((updater, action = 'MODIFICA ARCHIVIO', details = '', context = {}) => {
     setArchive(previous => {
       const nextRaw = typeof updater === 'function' ? updater(previous) : updater
       const next = normalizeArchive({
@@ -207,7 +246,8 @@ export default function App() {
       redoStack.current = []
       return next
     })
-  }, [profile, auth])
+    writeAuditLog(action, details, context)
+  }, [profile, auth, writeAuditLog])
 
   const undo = useCallback(() => {
     if (!undoStack.current.length) { showToast('NESSUNA OPERAZIONE DA ANNULLARE'); return }
@@ -215,9 +255,10 @@ export default function App() {
       redoStack.current.push(current)
       const previous = undoStack.current.pop()
       showToast('OPERAZIONE ANNULLATA · ⌘Z')
+      writeAuditLog('ANNULLA OPERAZIONE','RIPRISTINO STATO PRECEDENTE')
       return previous
     })
-  }, [showToast])
+  }, [showToast, writeAuditLog])
 
   const redo = useCallback(() => {
     if (!redoStack.current.length) { showToast('NESSUNA OPERAZIONE DA RIPRISTINARE'); return }
@@ -225,9 +266,10 @@ export default function App() {
       undoStack.current.push(current)
       const next = redoStack.current.pop()
       showToast('OPERAZIONE RIPRISTINATA · ⇧⌘Z')
+      writeAuditLog('RIPRISTINA OPERAZIONE','RIPRISTINO STATO SUCCESSIVO')
       return next
     })
-  }, [showToast])
+  }, [showToast, writeAuditLog])
 
   useEffect(() => {
     const handler = event => {
@@ -335,7 +377,7 @@ export default function App() {
     if (!visibleCategories.includes(item.category)) { window.alert('CATEGORIA NON AUTORIZZATA.'); return }
     if (isCoach && profileCoach && upper(item.coach) !== profileCoach) { window.alert('PUOI CREARE SESSIONI SOLTANTO PER IL TUO PROFILO ALLENATORE.'); return }
     const exists = archive.sessions.some(s => s.id === item.id)
-    commit(a => ({...a,sessions:exists?a.sessions.map(s=>s.id===item.id?item:s):[...a.sessions,item]}), exists ? 'MODIFICA SESSIONE' : 'CREA SESSIONE', item.coach)
+    commit(a => ({...a,sessions:exists?a.sessions.map(s=>s.id===item.id?item:s):[...a.sessions,item]}), exists ? 'MODIFICA SESSIONE' : 'CREA SESSIONE', item.coach, { objectType:'SESSIONE', objectId:item.id, category:item.category })
     setSessionModal(null)
   }
 
@@ -345,7 +387,7 @@ export default function App() {
     const count = archive.exercises.filter(e => e.sessionId === id).length
     if(!confirm(`ELIMINARE LA SESSIONE E LE ${count} ESERCITAZIONI AL SUO INTERNO?`)) return
     if(!authorize('PASSWORD PER ELIMINARE LA SESSIONE:')) return
-    commit(a=>({...a,sessions:a.sessions.filter(s=>s.id!==id),exercises:a.exercises.filter(e=>e.sessionId!==id)}), 'ELIMINA SESSIONE', session?.coach)
+    commit(a=>({...a,sessions:a.sessions.filter(s=>s.id!==id),exercises:a.exercises.filter(e=>e.sessionId!==id)}), 'ELIMINA SESSIONE', session?.coach, { objectType:'SESSIONE', objectId:id, category:session?.category, metadata:{exerciseCount:count} })
   }
 
   async function saveExercise(item, initial) {
@@ -415,6 +457,11 @@ export default function App() {
     redoStack.current = []
 
     await persistArchiveImmediately(nextArchive)
+    await writeAuditLog(
+      exists ? 'MODIFICA ESERCITAZIONE' : 'CREA ESERCITAZIONE',
+      clean.title,
+      { objectType:'ESERCITAZIONE', objectId:clean.id, category:clean.category, metadata:{sessionId:clean.sessionId} }
+    )
     setExerciseModal(null)
     showToast(exists ? 'ESERCITAZIONE MODIFICATA' : 'ESERCITAZIONE CREATA')
   }
@@ -425,19 +472,19 @@ export default function App() {
     if(!confirm('ELIMINARE QUESTA ESERCITAZIONE?')) return
     if(!authorize("PASSWORD PER ELIMINARE L'ESERCITAZIONE:")) return
     try { if(item?.imagePath) await removeCloudFile(item.imagePath) } catch(error){ console.error(error) }
-    commit(a=>({...a,exercises:a.exercises.filter(e=>e.id!==id)}), 'ELIMINA ESERCITAZIONE', item?.title)
+    commit(a=>({...a,exercises:a.exercises.filter(e=>e.id!==id)}), 'ELIMINA ESERCITAZIONE', item?.title, { objectType:'ESERCITAZIONE', objectId:id, category:item?.category })
   }
 
   function addDocuments(type, items){
     if (!canWrite) { window.alert('IL TUO RUOLO È IN SOLA LETTURA.'); return }
-    commit(a=>({...a,documents:{...a.documents,[type]:[...(a.documents[type]||[]),...items]}}),'CARICA DOCUMENTI',type)
+    commit(a=>({...a,documents:{...a.documents,[type]:[...(a.documents[type]||[]),...items]}}),'CARICA DOCUMENTI',type, { objectType:'DOCUMENTO', metadata:{count:items.length,type} })
   }
 
   async function deleteDocument(type,item){
     if (!canDelete) { window.alert('SOLO DIRETTORE E COORDINATORE POSSONO ELIMINARE DOCUMENTI.'); return }
     if(!authorize('PASSWORD PER ELIMINARE IL FILE:')) return
     try{ if(item.storagePath) await removeCloudFile(item.storagePath) }catch(error){console.error(error);alert('FILE RIMOSSO DALL’ARCHIVIO, MA NON DALLO STORAGE.')}
-    commit(a=>({...a,documents:{...a.documents,[type]:(a.documents[type]||[]).filter(x=>x.id!==item.id)}}),'ELIMINA DOCUMENTO',item.title)
+    commit(a=>({...a,documents:{...a.documents,[type]:(a.documents[type]||[]).filter(x=>x.id!==item.id)}}),'ELIMINA DOCUMENTO',item.title, { objectType:'DOCUMENTO', objectId:item.id, metadata:{type} })
   }
 
   function exportArchive() {
@@ -449,6 +496,7 @@ export default function App() {
     link.click()
     URL.revokeObjectURL(link.href)
     showToast('BACKUP ESPORTATO')
+    writeAuditLog('ESPORTA BACKUP','ARCHIVIO JSON ESPORTATO',{objectType:'BACKUP'})
   }
 
   async function importArchive(file) {
@@ -494,7 +542,7 @@ export default function App() {
     <nav className="view-tabs"><button className={view==='sessions'?'active':''} onClick={()=>setView('sessions')}>SESSIONI ALLENAMENTO</button><button className={view==='library'?'active':''} onClick={()=>setView('library')}>LIBRERIA ESERCITAZIONI</button>{selectedCategory&&<button className={view==='matches'?'active':''} onClick={()=>setView('matches')}>PARTITE</button>}</nav>
     {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}'</p></div><div>{canWrite && <button onClick={()=>openNewExercise(s)}>＋ ESERCITAZIONE</button>}{canWrite && <button className="soft" onClick={()=>setSessionModal(s)}>MODIFICA</button>}{canDelete && <button className="soft" onClick={()=>deleteSession(s.id)}>ELIMINA</button>}</div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
     {view==='library' && <main><div className="section-title"><div><h2>LIBRERIA ESERCITAZIONI</h2><p>TUTTE LE ESERCITAZIONI DELL’ARCHIVIO.</p></div><b>{filteredExercises.length} ESERCITAZIONI</b></div>{!filteredExercises.length && <EmptyState title="NESSUNA ESERCITAZIONE TROVATA" text="MODIFICA I FILTRI O AGGIUNGI UNA ESERCITAZIONE."/>}<div className="exercise-grid library">{filteredExercises.map(e=>{const s=archive.sessions.find(x=>x.id===e.sessionId);return <ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>s&&setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>})}</div></main>}
-    {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} readOnly={!canWrite} onChange={items=>{if(!canWrite)return;commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory)}}/></main>}
+    {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} readOnly={!canWrite} onChange={items=>{if(!canWrite)return;commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory, { objectType:'CALENDARIO PARTITE', category:selectedCategory })}}/></main>}
     <div className="build-badge">HOTFIX 2</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
     {toast && <div className="action-toast">{toast}</div>}
     {auditOpen && <AuditModal items={archive.audit||[]} onClose={()=>setAuditOpen(false)}/>}
@@ -512,15 +560,3 @@ function EmptyState({title,text}) {
   return <div className="app-empty"><b>{title}</b><span>{text}</span></div>
 }
 
-function AuditModal({items,onClose}) {
-  const ordered=[...items].reverse()
-  return <Modal title="CRONOLOGIA OPERAZIONI" onClose={onClose} wide>
-    <div className="audit-list">
-      {ordered.length ? ordered.map((item,index)=><article key={`${item.at}-${index}`}>
-        <b>{item.action||'OPERAZIONE'}</b>
-        <span>{item.details||'—'}{item.userName ? ` · ${item.userName}` : ''}</span>
-        <small>{new Date(item.at||Date.now()).toLocaleString('it-IT')}</small>
-      </article>) : <EmptyState title="NESSUNA OPERAZIONE REGISTRATA" text="LA CRONOLOGIA COMPARIRÀ QUI."/>}
-    </div>
-  </Modal>
-}

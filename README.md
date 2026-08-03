@@ -1,34 +1,26 @@
-# ACQ Scuola Calcio v24 Cloud · Fase 3A
+# ACQ Scuola Calcio v24 Cloud · Fase 3B
 
 ## Novità
 
-- profili utente collegati a Supabase Auth
-- ruoli: Direttore Tecnico, Coordinatore, Allenatore, Collaboratore
-- categorie assegnate a ogni utente
-- allenatore associato al profilo
-- account attivo o sospeso
-- pannello Gestione utenti riservato al Direttore
-- Collaboratore in sola lettura
-- Allenatore limitato alle categorie assegnate e al proprio cognome
-- eliminazioni consentite soltanto a Direttore e Coordinatore
-- valutazioni consentite soltanto a Direttore e Coordinatore
-- audit con nome, email e ruolo di chi effettua la modifica
+- registro modifiche permanente su tabella Supabase dedicata
+- log immutabili: nessun utente può modificarli o eliminarli
+- autore, email, ruolo, dispositivo, categoria e oggetto coinvolto
+- tracciamento di creazioni, modifiche, eliminazioni, backup, undo/redo e accessi
+- Centro Cronologia con ricerca e filtri
+- filtri per operazione, categoria, utente e intervallo date
+- riepilogo numerico delle operazioni
+- esportazione CSV
+- aggiornamento Realtime del registro
+- Direttore e Coordinatore vedono tutti i log
+- Allenatore e Collaboratore vedono soltanto i propri log
 
 ## Installazione
 
-1. Eseguire `supabase_phase3a.sql` in Supabase → SQL Editor.
-2. Caricare tutti i file del progetto su GitHub sovrascrivendo quelli esistenti.
-3. Attendere il deploy verde.
-4. Accedere con `lucascartocci@gmail.com`: lo script assegna automaticamente il ruolo Direttore Tecnico.
+1. Aprire `supabase_phase3b.sql`.
+2. Supabase → SQL Editor → New query.
+3. Incollare tutto e premere Run.
+4. Solo dopo il messaggio Success, caricare tutti i file su GitHub.
+5. Attendere il deploy verde.
+6. Fare logout e login.
 
-Per aggiungere altri utenti:
-Supabase → Authentication → Users → Add user.
-Poi entra nel sito come Direttore → UTENTI e configura ruolo, categorie e allenatore associato.
-
-
-## Ordine obbligatorio
-
-1. Eseguire prima `supabase_phase3a.sql`.
-2. Verificare che la query termini con `Success`.
-3. Solo dopo caricare i file su GitHub.
-4. Effettuare logout e login per ricaricare il nuovo profilo.
+Non eliminare `supabase_phase3a.sql`: resta utile per una nuova installazione completa.
