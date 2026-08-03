@@ -1,3 +1,3 @@
-# Fase 6I
+# Fase 6J
 
-Rifinitura grafica della sezione di caricamento documenti.
+Salvataggio atomico dei documenti e audit interno dei principali conflitti di sincronizzazione.

@@ -62,7 +62,8 @@ export default function DocumentLibrary({ type, items, onAdd, onDelete, onClose,
         })
       }
 
-      await onAdd(uploaded)
+      const confirmedArchive = await onAdd(uploaded)
+      if (!confirmedArchive) throw new Error('IL CLOUD NON HA RESTITUITO UNA CONFERMA VALIDA.')
 
       setFiles([])
       setTitle('')
@@ -80,7 +81,7 @@ export default function DocumentLibrary({ type, items, onAdd, onDelete, onClose,
       }
 
       window.alert(
-        'CARICAMENTO NON RIUSCITO. IL DOCUMENTO NON È STATO CONFERMATO NEL GESTIONALE.\n\n'
+        'CARICAMENTO NON RIUSCITO. IL DOCUMENTO NON È STATO CONFERMATO NEL GESTIONALE E GLI EVENTUALI FILE PARZIALI SONO STATI RIMOSSI.\n\n'
         + (error.message || 'ERRORE SCONOSCIUTO')
       )
     }finally{

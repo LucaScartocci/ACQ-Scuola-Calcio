@@ -298,6 +298,7 @@ export default function App() {
         if (error) throw error
         const cloud = data?.data && Object.keys(data.data).length ? normalizeArchive(data.data) : emptyArchive()
         applyingRemote.current = true
+        archiveRef.current = cloud
         setArchive(cloud)
         localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(cloud))
         undoStack.current = []
@@ -309,7 +310,9 @@ export default function App() {
         console.error(error)
         const cached = localStorage.getItem(LOCAL_CACHE_KEY)
         applyingRemote.current = true
-        setArchive(cached ? normalizeArchive(JSON.parse(cached)) : emptyArchive())
+        const fallbackArchive = cached ? normalizeArchive(JSON.parse(cached)) : emptyArchive()
+        archiveRef.current = fallbackArchive
+        setArchive(fallbackArchive)
         applyingRemote.current = false
         setHydrated(true)
         setStatus(cached ? 'MODALITÀ OFFLINE · COPIA LOCALE' : 'ERRORE CLOUD')
@@ -318,20 +321,18 @@ export default function App() {
       channel = supabase.channel('acq-v24').on('postgres_changes',{event:'*',schema:'public',table:'app_state',filter:`id=eq.${CLOUD_STATE_ID}`}, payload => {
         if (!payload.new || !payload.new.data || applyingRemote.current) return
         const next = normalizeArchive(payload.new.data)
-        let applied = false
-        setArchive(current => {
-          const currentTime = Date.parse(current.updatedAt || '') || 0
-          const nextTime = Date.parse(next.updatedAt || '') || 0
-          if (currentTime && nextTime && nextTime <= currentTime) return current
-          applied = true
-          archiveRef.current = next
-          localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(next))
-          return next
-        })
-        if (applied) {
-          setStatus('ARCHIVIO SINCRONIZZATO')
-          showToast('AGGIORNATO DA ALTRO DISPOSITIVO')
-        }
+        const currentTime = Date.parse(archiveRef.current?.updatedAt || '') || 0
+        const nextTime = Date.parse(next.updatedAt || '') || 0
+
+        if (currentTime && nextTime && nextTime <= currentTime) return
+
+        applyingRemote.current = true
+        archiveRef.current = next
+        setArchive(next)
+        localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(next))
+        applyingRemote.current = false
+        setStatus('ARCHIVIO SINCRONIZZATO')
+        showToast('AGGIORNATO DA ALTRO DISPOSITIVO')
       }).subscribe()
     }
     start()
@@ -354,8 +355,15 @@ export default function App() {
       setStatus('SALVATAGGIO…')
       const data = { ...archive, updatedAt: new Date().toISOString() }
       const { error } = await supabase.from('app_state').upsert({ id:CLOUD_STATE_ID, data, updated_at:new Date().toISOString(), updated_by:auth.user.email },{onConflict:'id'})
-      setStatus(error ? 'ERRORE SALVATAGGIO' : 'ARCHIVIO SINCRONIZZATO')
-      if(error) console.error(error)
+      if (error) {
+        setStatus('ERRORE SALVATAGGIO')
+        console.error(error)
+      } else {
+        const normalizedSaved = normalizeArchive(data)
+        archiveRef.current = normalizedSaved
+        localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(normalizedSaved))
+        setStatus('ARCHIVIO SINCRONIZZATO')
+      }
     }, 700)
     return () => clearTimeout(saveTimer.current)
   }, [archive, auth, hydrated, canWrite])
@@ -505,6 +513,7 @@ export default function App() {
   }
 
   async function persistArchiveImmediately(nextArchive, successMessage = 'ARCHIVIO SINCRONIZZATO', offlineMessage = 'MODIFICA SALVATA IN LOCALE') {
+    clearTimeout(saveTimer.current)
     const normalized = normalizeArchive({ ...nextArchive, updatedAt: new Date().toISOString() })
     skipNextAutoSave.current = true
     applyingRemote.current = true
@@ -923,42 +932,83 @@ export default function App() {
       window.alert('IL TUO RUOLO È IN SOLA LETTURA.')
       throw new Error('PERMESSO NEGATO')
     }
+    if (!['meetings','teaching'].includes(type)) {
+      throw new Error('SEZIONE DOCUMENTI NON VALIDA')
+    }
     if (!Array.isArray(items) || !items.length) return
 
-    const currentArchive = archiveRef.current
-    const nextArchive = normalizeArchive({
-      ...currentArchive,
-      documents:{
-        ...currentArchive.documents,
-        [type]:[...(currentArchive.documents?.[type] || []), ...items]
-      },
-      audit:[
-        ...(currentArchive.audit || []),
-        makeAuditEntry(
-          'CARICA DOCUMENTI',
-          type,
-          profile || {email:auth?.user?.email}
-        )
-      ].slice(-200),
-      updatedAt:new Date().toISOString(),
-    })
+    const expectedIds = items.map(item => String(item.id))
+    setStatus('SALVATAGGIO DOCUMENTI…')
 
-    await persistArchiveImmediately(
-      nextArchive,
-      'DOCUMENTI SALVATI',
-      'DOCUMENTI SALVATI IN LOCALE'
-    )
+    let returnedArchive = null
+    let lastError = null
+
+    // The RPC is idempotent: a retry cannot duplicate a document with the same ID.
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const { data, error } = await supabase.rpc('acq_add_technical_documents', {
+        p_state_id:CLOUD_STATE_ID,
+        p_section:type,
+        p_documents:items,
+        p_updated_by:auth.user.email || '',
+      })
+
+      if (error) {
+        lastError = error
+        console.error(`ATOMIC DOCUMENT SAVE ATTEMPT ${attempt}`, error)
+        if (attempt < 2) await new Promise(resolve => window.setTimeout(resolve, 350))
+        continue
+      }
+
+      const normalized = normalizeArchive(data)
+      const savedIds = new Set(
+        (normalized.documents?.[type] || []).map(document => String(document.id))
+      )
+      const verified = expectedIds.every(id => savedIds.has(id))
+
+      if (!verified) {
+        lastError = new Error('VERIFICA DOCUMENTI NON SUPERATA')
+        console.error(lastError)
+        if (attempt < 2) await new Promise(resolve => window.setTimeout(resolve, 350))
+        continue
+      }
+
+      returnedArchive = normalized
+      break
+    }
+
+    if (!returnedArchive) {
+      setStatus('ERRORE SALVATAGGIO DOCUMENTI')
+      const message = lastError?.message || 'IMPOSSIBILE CONFERMARE IL DOCUMENTO NEL CLOUD'
+      if (message.toLowerCase().includes('function') || message.toLowerCase().includes('schema cache')) {
+        throw new Error('ESEGUI PRIMA IL FILE supabase_phase6j.sql NEL SQL EDITOR DI SUPABASE.')
+      }
+      throw lastError || new Error(message)
+    }
+
+    applyingRemote.current = true
+    skipNextAutoSave.current = true
+    archiveRef.current = returnedArchive
+    setArchive(returnedArchive)
+    localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(returnedArchive))
+    applyingRemote.current = false
+    setStatus('ARCHIVIO SINCRONIZZATO')
 
     await writeAuditLog(
       'CARICA DOCUMENTI',
       type,
       {
         objectType:'DOCUMENTO',
-        metadata:{count:items.length,type}
+        metadata:{
+          count:items.length,
+          type,
+          documentIds:expectedIds,
+          verified:true,
+        }
       }
     )
 
-    showToast(items.length === 1 ? 'DOCUMENTO SALVATO' : `${items.length} DOCUMENTI SALVATI`)
+    showToast(items.length === 1 ? 'DOCUMENTO SALVATO E VERIFICATO' : `${items.length} DOCUMENTI SALVATI E VERIFICATI`)
+    return returnedArchive
   }
 
   async function deleteDocument(type,item){
@@ -966,31 +1016,52 @@ export default function App() {
       window.alert('SOLO IL DIRETTORE PUÒ ELIMINARE DOCUMENTI.')
       return
     }
+    if (!['meetings','teaching'].includes(type)) {
+      window.alert('SEZIONE DOCUMENTI NON VALIDA.')
+      return
+    }
     if(!window.confirm(`ELIMINARE DEFINITIVAMENTE "${item.title || item.name}"?`)) return
 
-    const currentArchive = archiveRef.current
-    const nextArchive = normalizeArchive({
-      ...currentArchive,
-      documents:{
-        ...currentArchive.documents,
-        [type]:(currentArchive.documents?.[type] || []).filter(document => document.id !== item.id)
-      },
-      audit:[
-        ...(currentArchive.audit || []),
-        makeAuditEntry(
-          'ELIMINA DOCUMENTO',
-          item.title || item.name,
-          profile || {email:auth?.user?.email}
-        )
-      ].slice(-200),
-      updatedAt:new Date().toISOString(),
+    setStatus('ELIMINAZIONE DOCUMENTO…')
+
+    const { data, error } = await supabase.rpc('acq_delete_technical_document', {
+      p_state_id:CLOUD_STATE_ID,
+      p_section:type,
+      p_document_id:String(item.id),
+      p_updated_by:auth.user.email || '',
     })
 
-    await persistArchiveImmediately(
-      nextArchive,
-      'DOCUMENTO ELIMINATO',
-      'ELIMINAZIONE SALVATA IN LOCALE'
-    )
+    if (error) {
+      console.error('ATOMIC DOCUMENT DELETE', error)
+      setStatus('ERRORE ELIMINAZIONE DOCUMENTO')
+      if (
+        error.message?.toLowerCase().includes('function')
+        || error.message?.toLowerCase().includes('schema cache')
+      ) {
+        window.alert('ESEGUI PRIMA supabase_phase6j.sql NEL SQL EDITOR DI SUPABASE.')
+      } else {
+        window.alert('ELIMINAZIONE NON RIUSCITA: ' + (error.message || 'ERRORE'))
+      }
+      return
+    }
+
+    const returnedArchive = normalizeArchive(data)
+    const stillPresent = (returnedArchive.documents?.[type] || [])
+      .some(document => String(document.id) === String(item.id))
+
+    if (stillPresent) {
+      setStatus('ERRORE VERIFICA ELIMINAZIONE')
+      window.alert('IL DATABASE NON HA CONFERMATO L’ELIMINAZIONE. RIPROVA.')
+      return
+    }
+
+    applyingRemote.current = true
+    skipNextAutoSave.current = true
+    archiveRef.current = returnedArchive
+    setArchive(returnedArchive)
+    localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(returnedArchive))
+    applyingRemote.current = false
+    setStatus('ARCHIVIO SINCRONIZZATO')
 
     try {
       if(item.storagePath) await removeCloudFile(item.storagePath)
@@ -1005,7 +1076,7 @@ export default function App() {
       {
         objectType:'DOCUMENTO',
         objectId:item.id,
-        metadata:{type}
+        metadata:{type,verified:true}
       }
     )
 
