@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Modal from './Modal'
 import { upper, uid } from '../lib/archive'
 import { removeCloudFile, uploadCloudFile } from '../lib/storage'
@@ -23,7 +23,7 @@ const fileIcon = type => {
   return '📎'
 }
 
-export default function DocumentLibrary({ type, items, onAdd, onDelete, onClose, readOnly=false }) {
+export default function DocumentLibrary({ type, items, onAdd, onDelete, onClose, readOnly=false, highlightId='' }) {
   const [title,setTitle] = useState('')
   const [search,setSearch] = useState('')
   const [files,setFiles] = useState([])
@@ -36,6 +36,15 @@ export default function DocumentLibrary({ type, items, onAdd, onDelete, onClose,
       .filter(x=>!q||upper([x.title,x.name,x.description].join(' ')).includes(q))
       .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))
   },[items,search])
+
+  useEffect(() => {
+    if (!highlightId) return
+    const timer = window.setTimeout(() => {
+      const element = document.querySelector(`[data-document-id="${CSS.escape(String(highlightId))}"]`)
+      if (element) element.scrollIntoView({behavior:'smooth',block:'center'})
+    }, 120)
+    return () => window.clearTimeout(timer)
+  }, [highlightId, items])
 
   async function submit(){
     if(!files.length){
@@ -161,7 +170,7 @@ export default function DocumentLibrary({ type, items, onAdd, onDelete, onClose,
       </div>}
       <input className="document-search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="CERCA NELLA LIBRERIA…"/>
       <div className="document-grid">
-        {visible.map(item=><article className="document-card" key={item.id}>
+        {visible.map(item=><article data-document-id={item.id} className={`document-card ${String(item.id)===String(highlightId)?'notification-highlight':''}`} key={item.id}>
           <div className="document-icon">{fileIcon(item.type)}</div>
           <div className="document-info"><h3>{item.title}</h3><p>{item.name}</p><small>{sizeLabel(item.size||0)} · {new Date(item.createdAt).toLocaleDateString('it-IT')}</small></div>
           <footer><a href={item.url} target="_blank" rel="noreferrer">APRI</a><a href={item.url} download={item.name}>SCARICA</a>{!readOnly && <button onClick={()=>onDelete(item)}>ELIMINA</button>}</footer>

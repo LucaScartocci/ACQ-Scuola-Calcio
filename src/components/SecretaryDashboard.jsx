@@ -13,6 +13,7 @@ export default function SecretaryDashboard({ archive, profile, status, isOnline,
   const [attendanceStatsOpen,setAttendanceStatsOpen]=useState(false)
   const [attendanceSession,setAttendanceSession]=useState(null)
   const [expiryNotificationsOpen,setExpiryNotificationsOpen]=useState(false)
+  const [documentTarget,setDocumentTarget]=useState({playerId:'',documentId:''})
 
   const sessions=useMemo(()=>archive.sessions
     .filter(session=>!category||session.category===category)
@@ -24,12 +25,19 @@ export default function SecretaryDashboard({ archive, profile, status, isOnline,
     [archive.players,archive.playerDocuments]
   )
 
+
+  function openExpiryTarget(item) {
+    setExpiryNotificationsOpen(false)
+    setDocumentTarget({playerId:item.playerId,documentId:item.document?.id || ''})
+    setDocumentsOpen(true)
+  }
+
   return <div className="secretary-shell secretary-dashboard-only">
     <header className="secretary-hero">
       <div><small>AREA SEGRETERIA</small><h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1></div>
       <div className="secretary-brand"><span>2026/27</span><img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`} alt="Acquacetosa"/><button onClick={onSignOut}>ESCI</button></div>
       <nav>
-        <button onClick={()=>setDocumentsOpen(true)}>TESSERATI</button>
+        <button onClick={()=>{setDocumentTarget({playerId:'',documentId:''});setDocumentsOpen(true)}}>TESSERATI</button>
         <button onClick={()=>setCalendarsOpen(true)}>CALENDARI PARTITE</button>
         <button onClick={()=>setAttendanceStatsOpen(true)}>PRESENZE</button>
         <button className="secretary-expiry-trigger" onClick={()=>setExpiryNotificationsOpen(true)}>
@@ -59,8 +67,8 @@ export default function SecretaryDashboard({ archive, profile, status, isOnline,
         </article>
       })}
     </main>
-{expiryNotificationsOpen&&<SecretaryExpiryNotifications players={archive.players||[]} playerDocuments={archive.playerDocuments||{}} onClose={()=>setExpiryNotificationsOpen(false)}/>}
-    {documentsOpen&&<PlayerDocumentsManager players={archive.players} playerDocuments={archive.playerDocuments||{}} currentUser={[profile.first_name,profile.last_name].filter(Boolean).join(' ')} onChange={onSavePlayerDocuments} onClose={()=>setDocumentsOpen(false)}/>}
+{expiryNotificationsOpen&&<SecretaryExpiryNotifications players={archive.players||[]} playerDocuments={archive.playerDocuments||{}} onNavigate={openExpiryTarget} onClose={()=>setExpiryNotificationsOpen(false)}/>}
+    {documentsOpen&&<PlayerDocumentsManager players={archive.players} playerDocuments={archive.playerDocuments||{}} initialPlayerId={documentTarget.playerId} highlightDocumentId={documentTarget.documentId} currentUser={[profile.first_name,profile.last_name].filter(Boolean).join(' ')} onChange={onSavePlayerDocuments} onClose={()=>{setDocumentsOpen(false);setDocumentTarget({playerId:'',documentId:''})}}/>}
     {calendarsOpen&&<SecretaryCalendars matchesByCategory={archive.matchesByCategory} onClose={()=>setCalendarsOpen(false)}/>}
     {attendanceStatsOpen&&<AttendanceStatistics archive={archive} visibleCategories={CATEGORIES} onClose={()=>setAttendanceStatsOpen(false)}/>}
     {attendanceSession&&<AttendanceModal session={attendanceSession} players={archive.players} attendance={archive.attendanceBySession[attendanceSession.id]} onSave={async ids=>{await onSaveAttendance(attendanceSession,ids);setAttendanceSession(null)}} onClose={()=>setAttendanceSession(null)}/>}

@@ -69,7 +69,7 @@ export function getSecretaryExpiryNotifications(players, playerDocuments) {
   return rows.sort((a,b) => a.days - b.days || a.playerName.localeCompare(b.playerName,'it'))
 }
 
-export default function SecretaryExpiryNotifications({ players, playerDocuments, onClose }) {
+export default function SecretaryExpiryNotifications({ players, playerDocuments, onNavigate, onClose }) {
   const [category, setCategory] = useState('')
   const [type, setType] = useState('')
   const [query, setQuery] = useState('')
@@ -132,7 +132,7 @@ export default function SecretaryExpiryNotifications({ players, playerDocuments,
           </div>
         }
 
-        {filtered.map(item=><article key={item.id} className={item.status}>
+        {filtered.map(item=><article key={item.id} className={item.status} role="button" tabIndex={0} onClick={()=>onNavigate?.(item)} onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onNavigate?.(item)}}}>
           <div className="secretary-expiry-icon">
             {item.status === 'expired' ? '!' : item.status === 'today' ? 'O' : '30'}
           </div>
@@ -152,8 +152,9 @@ export default function SecretaryExpiryNotifications({ players, playerDocuments,
             <footer>
               <strong>{item.message}</strong>
               <span>CARICATO IL {item.document.uploadedAt ? new Date(item.document.uploadedAt).toLocaleDateString('it-IT') : '—'}</span>
+              <button type="button" className="secretary-expiry-open" onClick={event=>{event.stopPropagation();onNavigate?.(item)}}>VAI AL TESSERATO</button>
               {item.document.url &&
-                <a href={item.document.url} target="_blank" rel="noreferrer">APRI DOCUMENTO</a>
+                <a onClick={event=>event.stopPropagation()} href={item.document.url} target="_blank" rel="noreferrer">APRI FILE</a>
               }
             </footer>
           </div>

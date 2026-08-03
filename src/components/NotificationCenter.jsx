@@ -31,6 +31,7 @@ export default function NotificationCenter({
   onMarkRead,
   onMarkAllRead,
   onRefresh,
+  onNavigate,
   onClose,
 }) {
   const [query, setQuery] = useState('')
@@ -54,6 +55,20 @@ export default function NotificationCenter({
   }, [notifications, readIds, query, type, onlyUnread])
 
   const unreadCount = notifications.filter(item => !readIds.has(item.id)).length
+
+  async function openNotification(item) {
+    if (!readIds.has(item.id)) await onMarkRead(item.id)
+    if (onNavigate) onNavigate(item)
+  }
+
+  function destinationLabel(item) {
+    if (item.notification_type === 'session' || item.object_type === 'SESSIONE') return 'VAI ALLA SESSIONE'
+    const section = String(item.metadata?.type || '').toLowerCase()
+    if (section === 'meetings') return 'APRI RIUNIONI TECNICHE'
+    if (section === 'teaching') return 'APRI MATERIALE DIDATTICO'
+    if (item.notification_type === 'document') return 'APRI DOCUMENTI'
+    return 'APRI'
+  }
 
   function resetFilters() {
     setQuery('')
@@ -113,7 +128,15 @@ export default function NotificationCenter({
           return <article
             key={item.id}
             className={unread ? 'unread' : ''}
-            onClick={() => unread && onMarkRead(item.id)}
+            onClick={() => openNotification(item)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={event => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                openNotification(item)
+              }
+            }}
           >
             <div className={`notification-icon type-${item.notification_type || 'system'}`}>
               {TYPE_ICONS[item.notification_type] || '!'}
@@ -138,18 +161,16 @@ export default function NotificationCenter({
               </footer>
             </div>
 
-            {unread &&
-              <button
-                type="button"
-                className="mark-read"
-                onClick={event => {
-                  event.stopPropagation()
-                  onMarkRead(item.id)
-                }}
-              >
-                SEGNA LETTA
-              </button>
-            }
+            <button
+              type="button"
+              className="notification-open-button"
+              onClick={event => {
+                event.stopPropagation()
+                openNotification(item)
+              }}
+            >
+              {destinationLabel(item)}
+            </button>
           </article>
         })}
       </section>

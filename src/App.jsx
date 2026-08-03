@@ -60,6 +60,7 @@ export default function App() {
   const [playersOpen, setPlayersOpen] = useState(false)
   const [attendanceSession, setAttendanceSession] = useState(null)
   const [attendanceStatsOpen, setAttendanceStatsOpen] = useState(false)
+  const [notificationTarget, setNotificationTarget] = useState(null)
   const saveTimer = useRef(null)
   const applyingRemote = useRef(false)
   const undoStack = useRef([])
@@ -491,8 +492,51 @@ export default function App() {
   const visibleSessions = categorySessions.filter(s => !search || upper([s.coach,s.objective].join(' ')).includes(upper(search)) || filteredExercises.some(e=>e.sessionId===s.id))
 
   useEffect(() => {
+    if (notificationTarget?.type !== 'session' || !notificationTarget.id) return
+    const timer = window.setTimeout(() => {
+      const element = document.querySelector(`[data-session-id="${CSS.escape(String(notificationTarget.id))}"]`)
+      if (element) element.scrollIntoView({behavior:'smooth',block:'center'})
+    }, 150)
+    const clear = window.setTimeout(() => setNotificationTarget(null), 4200)
+    return () => { window.clearTimeout(timer); window.clearTimeout(clear) }
+  }, [notificationTarget, visibleSessions.length])
+
+
+  useEffect(() => {
     if (view === 'matches' && !selectedCategory) setView('sessions')
   }, [selectedCategory, view])
+
+  async function navigateFromNotification(item) {
+    setNotificationsOpen(false)
+
+    const objectType = upper(item.object_type || '')
+    const notificationType = String(item.notification_type || '').toLowerCase()
+    const section = String(item.metadata?.type || '').toLowerCase()
+
+    if (objectType === 'SESSIONE' || notificationType === 'session') {
+      const sessionId = String(item.object_id || '')
+      const session = archiveRef.current.sessions.find(row => String(row.id) === sessionId)
+      const category = session?.category || item.category || ''
+      setView('sessions')
+      setSelectedCategory(category)
+      setSearch('')
+      setCoach('')
+      setPhase('')
+      setRating('')
+      setNotificationTarget({type:'session',id:sessionId})
+      return
+    }
+
+    if (section === 'meetings' || section === 'teaching' || notificationType === 'document') {
+      const targetSection = section === 'meetings' ? 'meetings' : 'teaching'
+      const documentIds = Array.isArray(item.metadata?.documentIds) ? item.metadata.documentIds : []
+      setNotificationTarget({type:'document',id:String(documentIds[0] || item.object_id || ''),section:targetSection})
+      setDocumentModal(targetSection)
+      return
+    }
+
+    showToast('COLLEGAMENTO NON DISPONIBILE PER QUESTA NOTIFICA')
+  }
 
   function resetFilters() {
     setSearch('')
@@ -1201,7 +1245,7 @@ export default function App() {
     <section className="filters"><input placeholder="CERCA PER TITOLO, OBIETTIVO O PAROLA CHIAVE…" value={search} onChange={e=>setSearch(e.target.value)}/><select value={coach} onChange={e=>setCoach(e.target.value)}><option value="">ALLENATORI</option>{COACHES.map(v=><option key={v}>{v}</option>)}</select><select value={selectedCategory} onChange={e=>setSelectedCategory(e.target.value)}><option value="">CATEGORIE</option>{visibleCategories.map(v=><option key={v}>{v}</option>)}</select><select value={rating} onChange={e=>setRating(e.target.value)}><option value="">VALUTAZIONI</option>{[1,2,3,4,5].map(v=><option key={v} value={v}>{v} STELLE</option>)}</select><select value={phase} onChange={e=>setPhase(e.target.value)}><option value="">FASE ALLENAMENTO</option>{PHASES.map(v=><option key={v}>{v}</option>)}</select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="recent">PIÙ RECENTI</option><option value="az">A-Z</option><option value="players">N° GIOCATORI</option></select><button className="reset-filters" onClick={resetFilters}>AZZERA FILTRI</button></section>
     <section className="category-strip"><button className={!selectedCategory?'active':''} onClick={()=>setSelectedCategory('')}><span>▦</span><b>ARCHIVIO COMPLETO</b><small>{archive.sessions.length}SS / {archive.exercises.length}ES</small></button>{visibleCategories.map(c=>{const ss=archive.sessions.filter(s=>s.category===c).length,es=archive.exercises.filter(e=>e.category===c).length;return <button key={c} className={selectedCategory===c?'active':''} onClick={()=>setSelectedCategory(c)}><span>⚽</span><b>{c}</b><small>{ss}SS / {es}ES</small></button>})}</section>
     <nav className="view-tabs"><button className={view==='sessions'?'active':''} onClick={()=>setView('sessions')}>SESSIONI ALLENAMENTO</button><button className={view==='library'?'active':''} onClick={()=>setView('library')}>LIBRERIA ESERCITAZIONI</button>{selectedCategory&&<button className={view==='matches'?'active':''} onClick={()=>setView('matches')}>PARTITE</button>}</nav>
-    {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}' · {(archive.attendanceBySession[s.id]?.presentIds||[]).length} PRESENTI</p></div><div>
+    {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section data-session-id={s.id} className={`session-card ${notificationTarget?.type==='session'&&String(notificationTarget.id)===String(s.id)?'notification-highlight':''}`} key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}' · {(archive.attendanceBySession[s.id]?.presentIds||[]).length} PRESENTI</p></div><div>
   <button className="pdf-session-button" onClick={()=>openSessionPdf(s)} disabled={pdfBusySessionId===s.id}>
     {pdfBusySessionId===s.id ? 'APERTURA…' : 'APRI'}
   </button>
@@ -1229,11 +1273,12 @@ export default function App() {
       onMarkRead={markNotificationRead}
       onMarkAllRead={markAllNotificationsRead}
       onRefresh={loadNotifications}
+      onNavigate={navigateFromNotification}
       onClose={()=>setNotificationsOpen(false)}
     />}
     {statisticsOpen && <StatisticsDashboard archive={archive} visibleCategories={visibleCategories} profile={profile} onClose={()=>setStatisticsOpen(false)}/>} 
     {usersOpen && <UserManagement currentProfile={profile} onChanged={loadProfile} onClose={()=>setUsersOpen(false)}/>}
-    {documentModal && <DocumentLibrary type={documentModal} items={archive.documents[documentModal]||[]} readOnly={!canWrite} onAdd={items=>addDocuments(documentModal,items)} onDelete={item=>deleteDocument(documentModal,item)} onClose={()=>setDocumentModal(null)}/>} 
+    {documentModal && <DocumentLibrary type={documentModal} items={archive.documents[documentModal]||[]} readOnly={!canWrite} highlightId={notificationTarget?.type==='document'&&notificationTarget.section===documentModal?notificationTarget.id:''} onAdd={items=>addDocuments(documentModal,items)} onDelete={item=>deleteDocument(documentModal,item)} onClose={()=>{setDocumentModal(null);setNotificationTarget(null)}}/>} 
   </div>
 }
 

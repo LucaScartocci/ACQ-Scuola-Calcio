@@ -1,17 +1,30 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Modal from './Modal'
 import { CATEGORIES, uid, upper } from '../lib/archive'
 import { removeCloudFile, uploadCloudFile } from '../lib/storage'
 
 const TYPES = ['TESSERAMENTO','CERTIFICATO MEDICO','NULLA OSTA','ALTRO DOCUMENTO']
 
-export default function PlayerDocumentsManager({ players, playerDocuments, onChange, currentUser, onClose }) {
+export default function PlayerDocumentsManager({ players, playerDocuments, onChange, currentUser, onClose, initialPlayerId='', highlightDocumentId='' }) {
   const [category, setCategory] = useState('')
   const [query, setQuery] = useState('')
-  const [selectedPlayerId, setSelectedPlayerId] = useState('')
+  const [selectedPlayerId, setSelectedPlayerId] = useState(initialPlayerId || '')
   const [documentType, setDocumentType] = useState(TYPES[0])
   const [expiryDate, setExpiryDate] = useState('')
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (initialPlayerId) setSelectedPlayerId(initialPlayerId)
+  }, [initialPlayerId])
+
+  useEffect(() => {
+    if (!highlightDocumentId) return
+    const timer = window.setTimeout(() => {
+      const element = document.querySelector(`[data-player-document-id="${CSS.escape(String(highlightDocumentId))}"]`)
+      if (element) element.scrollIntoView({behavior:'smooth',block:'center'})
+    }, 150)
+    return () => window.clearTimeout(timer)
+  }, [highlightDocumentId, selectedPlayerId, playerDocuments])
 
   const visiblePlayers = useMemo(() => {
     const q = upper(query)
@@ -115,7 +128,7 @@ export default function PlayerDocumentsManager({ players, playerDocuments, onCha
               {!documents.length && <div className="app-empty"><b>NESSUN DOCUMENTO</b><span>CARICA TESSERAMENTO, CERTIFICATO MEDICO, NULLA OSTA O ALTRI FILE.</span></div>}
               {documents.map(item=>{
                 const current=status(item)
-                return <article key={item.id}>
+                return <article key={item.id} data-player-document-id={item.id} className={String(item.id)===String(highlightDocumentId)?'notification-highlight':''}>
                   <div><b>{item.documentType}</b><span>{item.title}</span></div>
                   <time>{item.expiryDate ? `SCADENZA ${item.expiryDate.split('-').reverse().join('/')}` : 'NESSUNA SCADENZA'}</time>
                   <strong className={current.className}>{current.label}</strong>

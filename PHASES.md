@@ -1,3 +1,2 @@
-# Fase 6K
-
-Sincronizzazione Realtime completamente silenziosa.
+# Fase 6L
+Notifiche tecniche e scadenze Segreteria navigabili.
