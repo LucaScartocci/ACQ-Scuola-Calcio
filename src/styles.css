@@ -55,3 +55,8 @@
   .audit-list article{grid-template-columns:1fr}
   .audit-list small{justify-self:start}
 }
+
+.fatal-error{min-height:100vh;display:grid;place-content:center;gap:12px;padding:24px;text-align:center;background:#071b34;color:#fff}
+.fatal-error h1{margin:0;font-size:32px}
+.fatal-error p{max-width:680px;color:#c8d9ee}
+.fatal-error button{justify-self:center;min-height:48px;padding:12px 18px;border:0;border-radius:12px;background:#fff;color:#071b34;font-weight:900}

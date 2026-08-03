@@ -237,6 +237,14 @@ export default function App() {
     return true
   }
 
+  function openNewExercise(session) {
+    if (!session || !session.id) {
+      showToast('SESSIONE NON ANCORA DISPONIBILE. ATTENDI UN ISTANTE E RIPROVA.')
+      return
+    }
+    setExerciseModal({ session: { ...session } })
+  }
+
   function saveSession(item) {
     const exists = archive.sessions.some(s => s.id === item.id)
     commit(a => ({...a,sessions:exists?a.sessions.map(s=>s.id===item.id?item:s):[...a.sessions,item]}), exists ? 'MODIFICA SESSIONE' : 'CREA SESSIONE', item.coach)
@@ -252,6 +260,11 @@ export default function App() {
   }
 
   async function saveExercise(item, initial) {
+    const linkedSession = archive.sessions.find(session => session.id === item.sessionId)
+    if (!linkedSession) {
+      window.alert('LA SESSIONE COLLEGATA NON È STATA TROVATA. AGGIORNA LA PAGINA E RIPROVA.')
+      return
+    }
     const previous = archive.exercises.find(e => e.id === item.id)
     const ratingChanged = Number(item.rating || 0) !== Number(previous?.rating || 0)
     if (ratingChanged && Number(item.rating || 0) > 0 && !authorize('PASSWORD PER SALVARE LA VALUTAZIONE:')) return
@@ -261,10 +274,10 @@ export default function App() {
       if(item.removeImage && imagePath){ await removeCloudFile(imagePath); image=''; imagePath='' }
       if(item.imageFile){
         if(imagePath) await removeCloudFile(imagePath)
-        const uploaded=await uploadCloudFile(item.imageFile,`esercitazioni/${item.category.toLowerCase().replaceAll(' ','-')}`)
+        const uploaded=await uploadCloudFile(item.imageFile,`esercitazioni/${item.category.toLowerCase().replace(/\s+/g,'-')}`)
         image=uploaded.url; imagePath=uploaded.storagePath
       }
-      const clean={...item,image,imagePath}
+      const clean={...item,sessionId:linkedSession.id,category:linkedSession.category,image,imagePath}
       delete clean.imageFile; delete clean.removeImage
       const exists = Boolean(previous)
       commit(a=>({...a,exercises:exists?a.exercises.map(e=>e.id===clean.id?clean:e):[...a.exercises,clean]}), exists ? 'MODIFICA ESERCITAZIONE' : 'CREA ESERCITAZIONE', clean.title)
@@ -335,7 +348,7 @@ export default function App() {
     <section className="filters"><input placeholder="CERCA PER TITOLO, OBIETTIVO O PAROLA CHIAVE…" value={search} onChange={e=>setSearch(e.target.value)}/><select value={coach} onChange={e=>setCoach(e.target.value)}><option value="">ALLENATORI</option>{COACHES.map(v=><option key={v}>{v}</option>)}</select><select value={selectedCategory} onChange={e=>setSelectedCategory(e.target.value)}><option value="">CATEGORIE</option>{CATEGORIES.map(v=><option key={v}>{v}</option>)}</select><select value={rating} onChange={e=>setRating(e.target.value)}><option value="">VALUTAZIONI</option>{[1,2,3,4,5].map(v=><option key={v} value={v}>{v} STELLE</option>)}</select><select value={phase} onChange={e=>setPhase(e.target.value)}><option value="">FASE ALLENAMENTO</option>{PHASES.map(v=><option key={v}>{v}</option>)}</select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="recent">PIÙ RECENTI</option><option value="az">A-Z</option><option value="players">N° GIOCATORI</option></select><button className="reset-filters" onClick={resetFilters}>AZZERA FILTRI</button></section>
     <section className="category-strip"><button className={!selectedCategory?'active':''} onClick={()=>setSelectedCategory('')}><span>▦</span><b>ARCHIVIO COMPLETO</b><small>{archive.sessions.length}SS / {archive.exercises.length}ES</small></button>{CATEGORIES.map(c=>{const ss=archive.sessions.filter(s=>s.category===c).length,es=archive.exercises.filter(e=>e.category===c).length;return <button key={c} className={selectedCategory===c?'active':''} onClick={()=>setSelectedCategory(c)}><span>⚽</span><b>{c}</b><small>{ss}SS / {es}ES</small></button>})}</section>
     <nav className="view-tabs"><button className={view==='sessions'?'active':''} onClick={()=>setView('sessions')}>SESSIONI ALLENAMENTO</button><button className={view==='library'?'active':''} onClick={()=>setView('library')}>LIBRERIA ESERCITAZIONI</button>{selectedCategory&&<button className={view==='matches'?'active':''} onClick={()=>setView('matches')}>PARTITE</button>}</nav>
-    {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}'</p></div><div><button onClick={()=>setExerciseModal({session:s})}>＋ ESERCITAZIONE</button><button className="soft" onClick={()=>setSessionModal(s)}>MODIFICA</button><button className="soft" onClick={()=>deleteSession(s.id)}>ELIMINA</button></div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
+    {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}'</p></div><div><button onClick={()=>openNewExercise(s)}>＋ ESERCITAZIONE</button><button className="soft" onClick={()=>setSessionModal(s)}>MODIFICA</button><button className="soft" onClick={()=>deleteSession(s.id)}>ELIMINA</button></div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
     {view==='library' && <main><div className="section-title"><div><h2>LIBRERIA ESERCITAZIONI</h2><p>TUTTE LE ESERCITAZIONI DELL’ARCHIVIO.</p></div><b>{filteredExercises.length} ESERCITAZIONI</b></div>{!filteredExercises.length && <EmptyState title="NESSUNA ESERCITAZIONE TROVATA" text="MODIFICA I FILTRI O AGGIUNGI UNA ESERCITAZIONE."/>}<div className="exercise-grid library">{filteredExercises.map(e=>{const s=archive.sessions.find(x=>x.id===e.sessionId);return <ExerciseCard e={e} key={e.id} onEdit={()=>s&&setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>})}</div></main>}
     {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} onChange={items=>commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory)}/></main>}
     <div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
