@@ -1,26 +1,31 @@
-# ACQ Scuola Calcio v24 Cloud
+# ACQ Scuola Calcio v24 Cloud — Fase 1
 
-Web app React + Vite collegata a Supabase.
+Prima versione React/Vite operativa collegata a Supabase.
 
-## Pubblicazione nel repository esistente
+## Funzioni già presenti
 
-Questa versione richiede una build GitHub Actions. Carica tutti i file del progetto nel repository `ACQ-Scuola-Calcio`.
+- Login Supabase
+- Sincronizzazione Realtime tra dispositivi
+- Sessioni di allenamento
+- Esercitazioni
+- Libreria esercitazioni
+- Filtri
+- 30 partite per categoria
+- Convocazioni con PNG
+- Layout responsive
+- Deploy GitHub Pages
 
-1. Elimina o sostituisci il vecchio `index.html` statico.
-2. Carica tutto il contenuto di questo pacchetto.
-3. Vai su **Settings → Pages**.
-4. In **Source**, seleziona **GitHub Actions**.
-5. Dopo il commit, apri la scheda **Actions** e attendi il completamento del workflow.
+## Pubblicazione
 
-## Uso locale
-
-Richiede Node.js 20.19+ oppure 22.12+.
-
-```bash
-npm install
-npm run dev
-```
+1. Carica tutti i file nella radice del repository `ACQ-Scuola-Calcio`.
+2. Verifica che esista `.github/workflows/deploy.yml`.
+3. In **Settings → Pages**, imposta **Source → GitHub Actions**.
+4. Apri **Actions → Deploy GitHub Pages** e attendi la spunta verde.
 
 ## Supabase
 
-Il progetto è già configurato con il Project URL e la publishable key forniti. Non inserire mai una secret key nel codice.
+La tabella `app_state`, le policy RLS, il Realtime e l'utente devono essere già configurati.
+
+## Nota
+
+Questa è la Fase 1. `PHASES.md` contiene le attività delle fasi successive.

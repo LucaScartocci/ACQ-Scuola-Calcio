@@ -5,11 +5,18 @@ export const COACHES = [
 export const CATEGORIES = ['PICCOLI AMICI','PRIMI CALCI','PULCINI','ESORDIENTI']
 export const PHASES = ['ATTIVAZIONE','PARTE CENTRALE','PARTITA A TEMA']
 
+const safeId = prefix => {
+  try {
+    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') return globalThis.crypto.randomUUID()
+  } catch {}
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
 export const emptyArchive = () => ({
   sessions: [],
   exercises: [],
   matchesByCategory: Object.fromEntries(CATEGORIES.map(c => [c, Array.from({ length: 30 }, (_, i) => ({
-    id: crypto.randomUUID?.() || `m-${Date.now()}-${i}`,
+    id: safeId(`m-${i}`),
     slot: i + 1,
     opponent: '', logo: '', date: '', time: '', location: '', coach: '', callupPlayers: ''
   }))])),
@@ -35,7 +42,7 @@ export const normalizeArchive = (value) => {
     while (archive.matchesByCategory[category].length < 30) {
       const i = archive.matchesByCategory[category].length
       archive.matchesByCategory[category].push({
-        id: crypto.randomUUID?.() || `m-${Date.now()}-${i}`,
+        id: safeId(`m-${i}`),
         slot: i + 1, opponent: '', logo: '', date: '', time: '', location: '', coach: '', callupPlayers: ''
       })
     }
@@ -44,4 +51,4 @@ export const normalizeArchive = (value) => {
 }
 
 export const upper = value => String(value ?? '').toUpperCase()
-export const uid = () => crypto.randomUUID?.() || `id-${Date.now()}-${Math.random().toString(36).slice(2)}`
+export const uid = () => safeId('id')
