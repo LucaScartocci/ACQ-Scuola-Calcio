@@ -1,7 +1,7 @@
 {
   "name": "acq-scuola-calcio-v24-cloud",
   "private": true,
-  "version": "2.4.1-phase2d-hotfix1",
+  "version": "2.4.2-phase2d-hotfix2",
   "type": "module",
   "scripts": {
     "dev": "vite",

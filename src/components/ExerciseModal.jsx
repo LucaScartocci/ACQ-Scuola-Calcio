@@ -86,7 +86,9 @@ export default function ExerciseModal({ session, initial, onSave, onClose }) {
       }, initial || null)
     } catch (error) {
       console.error(error)
-      window.alert("NON È STATO POSSIBILE SALVARE L'ESERCITAZIONE: " + (error.message || 'ERRORE SCONOSCIUTO'))
+      if (error && error.message !== 'VALUTAZIONE NON AUTORIZZATA') {
+        window.alert("NON È STATO POSSIBILE SALVARE L'ESERCITAZIONE: " + (error.message || 'ERRORE SCONOSCIUTO'))
+      }
     } finally {
       setBusy(false)
     }

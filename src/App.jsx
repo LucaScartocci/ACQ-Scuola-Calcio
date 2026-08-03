@@ -107,15 +107,15 @@ export default function App() {
       }
 
       channel = supabase.channel('acq-v24').on('postgres_changes',{event:'*',schema:'public',table:'app_state',filter:`id=eq.${CLOUD_STATE_ID}`}, payload => {
-        if (payload.new?.data) {
-          applyingRemote.current = true
-          const next = normalizeArchive(payload.new.data)
-          setArchive(next)
+        if (!payload.new || !payload.new.data || applyingRemote.current) return
+        const next = normalizeArchive(payload.new.data)
+        setArchive(current => {
+          if (current.updatedAt && next.updatedAt && current.updatedAt === next.updatedAt) return current
           localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(next))
-          applyingRemote.current = false
-          setStatus('AGGIORNATO DA ALTRO DISPOSITIVO')
-          window.setTimeout(() => setStatus('ARCHIVIO SINCRONIZZATO'), 1800)
-        }
+          return next
+        })
+        setStatus('AGGIORNATO DA ALTRO DISPOSITIVO')
+        window.setTimeout(() => setStatus('ARCHIVIO SINCRONIZZATO'), 1800)
       }).subscribe()
     }
     start()
@@ -237,6 +237,37 @@ export default function App() {
     return true
   }
 
+  async function persistArchiveImmediately(nextArchive, successMessage = 'ARCHIVIO SINCRONIZZATO') {
+    const normalized = normalizeArchive({ ...nextArchive, updatedAt: new Date().toISOString() })
+    applyingRemote.current = true
+    setArchive(normalized)
+    localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(normalized))
+    applyingRemote.current = false
+
+    if (!navigator.onLine) {
+      setStatus('MODALITÀ OFFLINE · MODIFICHE IN ATTESA')
+      showToast('ESERCITAZIONE SALVATA IN LOCALE')
+      return normalized
+    }
+
+    setStatus('SALVATAGGIO CLOUD…')
+    const { error } = await supabase.from('app_state').upsert({
+      id: CLOUD_STATE_ID,
+      data: normalized,
+      updated_at: new Date().toISOString(),
+      updated_by: auth.user.email,
+    }, { onConflict: 'id' })
+
+    if (error) {
+      console.error('Immediate archive save error', error)
+      setStatus('ERRORE SALVATAGGIO CLOUD')
+      throw error
+    }
+
+    setStatus(successMessage)
+    return normalized
+  }
+
   function openNewExercise(session) {
     if (!session || !session.id) {
       showToast('SESSIONE NON ANCORA DISPONIBILE. ATTENDI UN ISTANTE E RIPROVA.')
@@ -260,29 +291,69 @@ export default function App() {
   }
 
   async function saveExercise(item, initial) {
-    const linkedSession = archive.sessions.find(session => session.id === item.sessionId)
+    const linkedSession = archive.sessions.find(session => String(session.id) === String(item.sessionId))
     if (!linkedSession) {
-      window.alert('LA SESSIONE COLLEGATA NON È STATA TROVATA. AGGIORNA LA PAGINA E RIPROVA.')
-      return
+      window.alert('LA SESSIONE COLLEGATA NON È STATA TROVATA. CHIUDI LA FINESTRA, RICARICA LA PAGINA E RIPROVA.')
+      throw new Error('SESSIONE COLLEGATA NON TROVATA')
     }
-    const previous = archive.exercises.find(e => e.id === item.id)
-    const ratingChanged = Number(item.rating || 0) !== Number(previous?.rating || 0)
-    if (ratingChanged && Number(item.rating || 0) > 0 && !authorize('PASSWORD PER SALVARE LA VALUTAZIONE:')) return
-    try {
-      let image=item.image||previous?.image||''
-      let imagePath=item.imagePath||previous?.imagePath||''
-      if(item.removeImage && imagePath){ await removeCloudFile(imagePath); image=''; imagePath='' }
-      if(item.imageFile){
-        if(imagePath) await removeCloudFile(imagePath)
-        const uploaded=await uploadCloudFile(item.imageFile,`esercitazioni/${item.category.toLowerCase().replace(/\s+/g,'-')}`)
-        image=uploaded.url; imagePath=uploaded.storagePath
-      }
-      const clean={...item,sessionId:linkedSession.id,category:linkedSession.category,image,imagePath}
-      delete clean.imageFile; delete clean.removeImage
-      const exists = Boolean(previous)
-      commit(a=>({...a,exercises:exists?a.exercises.map(e=>e.id===clean.id?clean:e):[...a.exercises,clean]}), exists ? 'MODIFICA ESERCITAZIONE' : 'CREA ESERCITAZIONE', clean.title)
-      setExerciseModal(null)
-    } catch(error){console.error(error);alert('SALVATAGGIO IMMAGINE NON RIUSCITO: '+error.message)}
+
+    const previous = archive.exercises.find(exercise => String(exercise.id) === String(item.id))
+    const ratingChanged = Number(item.rating || 0) !== Number((previous && previous.rating) || 0)
+    if (ratingChanged && Number(item.rating || 0) > 0 && !authorize('PASSWORD PER SALVARE LA VALUTAZIONE:')) {
+      throw new Error('VALUTAZIONE NON AUTORIZZATA')
+    }
+
+    let image = item.image || (previous && previous.image) || ''
+    let imagePath = item.imagePath || (previous && previous.imagePath) || ''
+
+    if (item.removeImage && imagePath) {
+      await removeCloudFile(imagePath)
+      image = ''
+      imagePath = ''
+    }
+
+    if (item.imageFile) {
+      if (imagePath) await removeCloudFile(imagePath)
+      const folderCategory = String(linkedSession.category || 'generale').toLowerCase().replace(/\s+/g, '-')
+      const uploaded = await uploadCloudFile(item.imageFile, `esercitazioni/${folderCategory}`)
+      image = uploaded.url
+      imagePath = uploaded.storagePath
+    }
+
+    const clean = {
+      ...item,
+      sessionId: linkedSession.id,
+      category: linkedSession.category,
+      image,
+      imagePath,
+      title: upper(item.title),
+      equipment: upper(item.equipment),
+      objective: upper(item.objective),
+      description: upper(item.description),
+      createdAt: Number(item.createdAt) || Date.now(),
+    }
+    delete clean.imageFile
+    delete clean.removeImage
+
+    const exists = Boolean(previous)
+    const nextExercises = exists
+      ? archive.exercises.map(exercise => String(exercise.id) === String(clean.id) ? clean : exercise)
+      : [...archive.exercises, clean]
+
+    const nextArchive = normalizeArchive({
+      ...archive,
+      exercises: nextExercises,
+      audit: [...(archive.audit || []), makeAuditEntry(exists ? 'MODIFICA ESERCITAZIONE' : 'CREA ESERCITAZIONE', clean.title)].slice(-200),
+      updatedAt: new Date().toISOString(),
+    })
+
+    undoStack.current.push(archive)
+    if (undoStack.current.length > HISTORY_LIMIT) undoStack.current.shift()
+    redoStack.current = []
+
+    await persistArchiveImmediately(nextArchive)
+    setExerciseModal(null)
+    showToast(exists ? 'ESERCITAZIONE MODIFICATA' : 'ESERCITAZIONE CREATA')
   }
 
   async function deleteExercise(id) {
@@ -351,7 +422,7 @@ export default function App() {
     {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}'</p></div><div><button onClick={()=>openNewExercise(s)}>＋ ESERCITAZIONE</button><button className="soft" onClick={()=>setSessionModal(s)}>MODIFICA</button><button className="soft" onClick={()=>deleteSession(s.id)}>ELIMINA</button></div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
     {view==='library' && <main><div className="section-title"><div><h2>LIBRERIA ESERCITAZIONI</h2><p>TUTTE LE ESERCITAZIONI DELL’ARCHIVIO.</p></div><b>{filteredExercises.length} ESERCITAZIONI</b></div>{!filteredExercises.length && <EmptyState title="NESSUNA ESERCITAZIONE TROVATA" text="MODIFICA I FILTRI O AGGIUNGI UNA ESERCITAZIONE."/>}<div className="exercise-grid library">{filteredExercises.map(e=>{const s=archive.sessions.find(x=>x.id===e.sessionId);return <ExerciseCard e={e} key={e.id} onEdit={()=>s&&setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>})}</div></main>}
     {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} onChange={items=>commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory)}/></main>}
-    <div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
+    <div className="build-badge">HOTFIX 2</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
     {toast && <div className="action-toast">{toast}</div>}
     {auditOpen && <AuditModal items={archive.audit||[]} onClose={()=>setAuditOpen(false)}/>}
     {sessionModal && <SessionModal initial={sessionModal.id?sessionModal:null} onSave={saveSession} onClose={()=>setSessionModal(null)}/>} 
