@@ -1,2 +1,3 @@
-# Fase 6E
-Hotfix statistiche presenze trasversali.
+# Fase 6F
+
+Separazione definitiva delle notifiche tecniche da quelle della Segreteria e nuovo header istituzionale.

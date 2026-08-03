@@ -984,3 +984,173 @@
   opacity:.55;
   cursor:wait;
 }
+
+/* FASE 6F · HEADER ISTITUZIONALE */
+.hero{
+  min-height:390px;
+  padding:34px 38px 32px;
+}
+
+.hero-institutional{
+  position:relative;
+  z-index:2;
+  max-width:850px;
+}
+
+.hero-kicker{
+  display:flex;
+  align-items:center;
+  gap:15px;
+  margin-bottom:20px;
+  color:#bfd5f4;
+  font-size:12px;
+  font-weight:850;
+  letter-spacing:.18em;
+}
+
+.hero-inline-season{
+  padding-left:15px;
+  border-left:1px solid rgba(255,255,255,.35);
+  color:#fff;
+  white-space:nowrap;
+}
+
+.hero-title-row{
+  display:flex;
+  align-items:center;
+  gap:24px;
+}
+
+.hero-title-row>img{
+  display:block!important;
+  width:118px;
+  height:118px;
+  flex:0 0 118px;
+  object-fit:contain;
+}
+
+.hero-title-row h1{
+  margin:0;
+  max-width:760px;
+  font-size:clamp(40px,5.15vw,67px);
+  line-height:.94;
+  letter-spacing:-.035em;
+}
+
+.hero-title-row p{
+  margin:12px 0 0;
+  color:#d4e2f3;
+  font-size:21px;
+  font-weight:400;
+  letter-spacing:.02em;
+}
+
+.hero-top-exit{
+  position:absolute;
+  top:31px;
+  right:38px;
+  z-index:3;
+  width:150px;
+  min-height:54px;
+  border:1px solid rgba(255,255,255,.32);
+  border-radius:28px;
+  background:rgba(255,255,255,.08);
+  color:#fff;
+  font-size:13px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.hero-top-exit:hover{
+  background:rgba(255,255,255,.15);
+}
+
+.hero-brand-block,
+.hero-season,
+.hero-exit{
+  display:none!important;
+}
+
+.hero nav{
+  margin-top:34px;
+  padding-right:0!important;
+}
+
+@media(max-width:900px){
+  .hero{
+    min-height:auto;
+    padding-top:28px;
+  }
+
+  .hero-top-exit{
+    top:24px;
+    right:24px;
+    width:120px;
+  }
+
+  .hero-kicker{
+    padding-right:145px;
+    flex-wrap:wrap;
+  }
+
+  .hero-title-row>img{
+    width:94px;
+    height:94px;
+    flex-basis:94px;
+  }
+
+  .hero-title-row p{
+    font-size:18px;
+  }
+}
+
+@media(max-width:650px){
+  .hero{
+    padding:22px 16px;
+  }
+
+  .hero-top-exit{
+    position:relative;
+    top:auto;
+    right:auto;
+    width:100%;
+    margin-top:20px;
+  }
+
+  .hero-kicker{
+    display:grid;
+    gap:7px;
+    padding-right:0;
+    font-size:9px;
+    letter-spacing:.12em;
+  }
+
+  .hero-inline-season{
+    padding-left:0;
+    border-left:0;
+  }
+
+  .hero-title-row{
+    align-items:flex-start;
+    gap:13px;
+  }
+
+  .hero-title-row>img{
+    width:68px;
+    height:68px;
+    flex-basis:68px;
+  }
+
+  .hero-title-row h1{
+    font-size:31px;
+  }
+
+  .hero-title-row p{
+    margin-top:8px;
+    font-size:15px;
+  }
+
+  .hero nav{
+    margin-top:22px;
+  }
+}

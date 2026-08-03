@@ -99,67 +99,65 @@ security definer
 set search_path = public
 as $$
 declare
-  resolved_type text := 'system';
-  resolved_title text := 'NUOVA ATTIVITÀ';
-  resolved_priority text := 'normal';
-  resolved_target_all boolean := false;
-  resolved_roles text[] := array['director','coordinator'];
-  resolved_categories text[] := '{}';
+  resolved_title text;
+  resolved_message text;
+  resolved_type text;
+  resolved_category text := coalesce(new.category,'');
+  resolved_roles text[] := array['director','coordinator','coach'];
+  document_section text := lower(coalesce(new.metadata ->> 'type',''));
 begin
-  -- Non trasformiamo accessi e operazioni puramente tecniche in notifiche.
+  -- Nessuna notifica tecnica per accessi, presenze, esercitazioni,
+  -- documenti tesserati, backup, utenti o altre operazioni gestionali.
   if new.action like 'ACCESSO%'
      or new.action like 'ANNULLA%'
      or new.action like 'RIPRISTINA%'
      or new.action like 'ESPORTA%'
+     or new.object_type in (
+       'PRESENZE',
+       'DOCUMENTO TESSERATO',
+       'ESERCITAZIONE',
+       'CALENDARIO PARTITE',
+       'BACKUP',
+       'UTENTE'
+     )
   then
     return new;
   end if;
 
-  if new.object_type = 'SESSIONE' then
+  -- Notifica soltanto la creazione di una nuova sessione.
+  if new.object_type = 'SESSIONE'
+     and new.action = 'CREA SESSIONE'
+  then
     resolved_type := 'session';
-    resolved_title := case
-      when new.action like 'CREA%' then 'NUOVA SESSIONE'
-      when new.action like 'ELIMINA%' then 'SESSIONE ELIMINATA'
-      else 'SESSIONE AGGIORNATA'
-    end;
-  elsif new.object_type = 'ESERCITAZIONE' then
-    resolved_type := 'exercise';
-    resolved_title := case
-      when new.action like 'CREA%' then 'NUOVA ESERCITAZIONE'
-      when new.action like 'ELIMINA%' then 'ESERCITAZIONE ELIMINATA'
-      else 'ESERCITAZIONE AGGIORNATA'
-    end;
-  elsif new.object_type = 'CALENDARIO PARTITE' then
-    resolved_type := 'match';
-    resolved_title := 'CALENDARIO PARTITE AGGIORNATO';
-  elsif new.object_type = 'DOCUMENTO' then
+    resolved_title := 'NUOVA SESSIONE DI ALLENAMENTO';
+    resolved_message :=
+      coalesce(nullif(new.details,''),'NUOVA SEDUTA')
+      || case
+           when resolved_category <> '' then ' · ' || resolved_category
+           else ''
+         end;
+
+  -- Notifica soltanto i caricamenti nelle due librerie tecniche,
+  -- effettuati da un Direttore.
+  elsif new.object_type = 'DOCUMENTO'
+        and new.action = 'CARICA DOCUMENTI'
+        and lower(coalesce(new.user_role,'')) in ('director','direttore')
+        and document_section in ('meetings','teaching')
+  then
     resolved_type := 'document';
-    resolved_title := case
-      when new.action like 'ELIMINA%' then 'DOCUMENTO ELIMINATO'
-      else 'NUOVO DOCUMENTO'
-    end;
-  elsif new.object_type = 'BACKUP' then
-    resolved_type := 'backup';
-    resolved_title := 'ARCHIVIO RIPRISTINATO';
-    resolved_priority := 'high';
-  elsif new.object_type = 'UTENTE' then
-    resolved_type := 'user';
-    resolved_title := 'PROFILO UTENTE AGGIORNATO';
-  else
-    resolved_type := 'system';
-    resolved_title := new.action;
-  end if;
 
-  if coalesce(new.category,'') <> '' then
-    resolved_categories := array[new.category];
-    resolved_roles := array['director','coordinator'];
-  else
-    resolved_target_all := true;
-    resolved_roles := '{}';
-  end if;
+    if document_section = 'meetings' then
+      resolved_title := 'NUOVA RIUNIONE TECNICA';
+      resolved_message := 'IL DIRETTORE HA CARICATO NUOVO MATERIALE NELLE RIUNIONI TECNICHE.';
+    else
+      resolved_title := 'NUOVO MATERIALE DIDATTICO';
+      resolved_message := 'IL DIRETTORE HA CARICATO NUOVO MATERIALE DIDATTICO.';
+    end if;
 
-  if new.action like 'ELIMINA%' or new.action like 'IMPORTA%' then
-    resolved_priority := 'high';
+    resolved_category := '';
+
+  else
+    return new;
   end if;
 
   insert into public.notifications (
@@ -182,20 +180,24 @@ begin
   )
   values (
     resolved_title,
-    coalesce(new.details,''),
+    resolved_message,
     resolved_type,
-    resolved_priority,
-    coalesce(new.category,''),
+    'normal',
+    resolved_category,
     new.user_id,
     coalesce(new.user_email,''),
     coalesce(new.user_name,''),
     coalesce(new.user_role,''),
     coalesce(new.object_type,''),
     coalesce(new.object_id,''),
-    resolved_target_all,
+    false,
     resolved_roles,
-    resolved_categories,
-    jsonb_build_object('audit_log_id',new.id) || coalesce(new.metadata,'{}'::jsonb),
+    case
+      when resolved_category <> '' then array[resolved_category]
+      else '{}'::text[]
+    end,
+    jsonb_build_object('audit_log_id',new.id)
+      || coalesce(new.metadata,'{}'::jsonb),
     new.created_at
   );
 
@@ -204,39 +206,8 @@ end;
 $$;
 
 drop trigger if exists audit_log_to_notification on public.audit_logs;
+
 create trigger audit_log_to_notification
 after insert on public.audit_logs
 for each row
 execute procedure public.create_acq_notification_from_audit();
-
-do $$
-begin
-  alter publication supabase_realtime add table public.notifications;
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$
-begin
-  alter publication supabase_realtime add table public.notification_reads;
-exception
-  when duplicate_object then null;
-end $$;
-
--- Notifica iniziale di attivazione della funzione.
-insert into public.notifications (
-  title,
-  message,
-  notification_type,
-  priority,
-  target_all,
-  created_at
-)
-values (
-  'CENTRO NOTIFICHE ATTIVATO',
-  'IL GESTIONALE ORA SEGNALA AUTOMATICAMENTE LE ATTIVITÀ IMPORTANTI.',
-  'system',
-  'normal',
-  true,
-  now()
-);

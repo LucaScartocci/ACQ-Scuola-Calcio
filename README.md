@@ -1,12 +1,41 @@
-# ACQ Scuola Calcio · Fase 6E
+# ACQ Scuola Calcio · Fase 6F
 
-## Correzione statistiche presenze
+## Notifiche tecniche corrette
 
-- conteggiate tutte le presenze reali, anche nelle sessioni di categorie diverse da quella anagrafica del tesserato
-- classifica ordinata per numero presenze, poi minuti, percentuale e nome
-- percentuale calcolata senza superare il 100%
-- indicazione delle presenze effettuate con altre categorie
-- totale Sessioni con presenze coerente con il filtro categoria
-- CSV aggiornato con colonna presenze in altre categorie
+Direttore, Coordinatori e Allenatori ricevono notifiche soltanto per:
 
-Non servono nuove query SQL.
+- nuova sessione di allenamento caricata da un membro dello staff tecnico
+- nuova riunione tecnica caricata da un Direttore
+- nuovo materiale didattico caricato da un Direttore
+
+Non ricevono notifiche per:
+
+- presenze
+- certificati medici
+- tesseramenti
+- documenti dei giocatori
+- esercitazioni
+- backup
+- utenti
+- operazioni della Segreteria
+
+Le scadenze documentali restano esclusivamente nell'Area Segreteria.
+
+## Nuovo header
+
+- logo spostato a sinistra
+- titolo `ASD ACQUACETOSA CENTRO CALCIO`
+- font del titolo leggermente ridotto
+- sottotitolo `Scuola calcio` più piccolo e non in grassetto
+- `2026/27` accanto ad `Archivio metodologico Acquacetosa`
+- rimossa la pillola stagione
+- pulsante `ESCI` spostato in alto a destra
+
+## Installazione
+
+1. Eseguire `supabase_phase6f.sql` nel SQL Editor di Supabase.
+2. Attendere `Success`.
+3. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
+4. Attendere il deploy verde.
+5. Fare logout e login.
+6. Aggiornare forzatamente il browser o riaprire la PWA.

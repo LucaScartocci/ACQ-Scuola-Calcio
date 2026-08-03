@@ -993,15 +993,23 @@ export default function App() {
 
   return <div className="app-shell">
     <header className="hero">
-      <div>
-        <small>ARCHIVIO METODOLOGICO ACQUACETOSA</small>
-        <h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1>
+      <div className="hero-institutional">
+        <div className="hero-kicker">
+          <span>ARCHIVIO METODOLOGICO ACQUACETOSA</span>
+          <span className="hero-inline-season">2026/27</span>
+        </div>
+
+        <div className="hero-title-row">
+          <img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`} alt="Acquacetosa"/>
+          <div>
+            <h1>ASD ACQUACETOSA<br/>CENTRO CALCIO</h1>
+            <p>Scuola calcio</p>
+          </div>
+        </div>
       </div>
-      <div className="hero-brand-block">
-        <div className="hero-season">2026/27</div>
-        <img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`} alt="Acquacetosa"/>
-        <button className="hero-exit" onClick={()=>supabase.auth.signOut()}>ESCI</button>
-      </div>
+
+      <button className="hero-top-exit" onClick={()=>supabase.auth.signOut()}>ESCI</button>
+
       <nav>
         {canWrite && <button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button>}
         <button onClick={()=>setDocumentModal('meetings')}>RIUNIONI TECNICHE</button>
