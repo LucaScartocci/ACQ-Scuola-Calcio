@@ -16,7 +16,7 @@ const safeId = prefix => {
 
 const emptyMatch = (slot) => ({
   id: safeId(`m-${slot}`), slot, opponent: '', logo: '', date: '', time: '',
-  location: '', coach: '', callupPlayers: ''
+  location: '', coach: '', callupPlayers: '', logoPath: '', competition: 'CAMPIONATO', meetingTime: '', meetingPlace: '', callupNotes: ''
 })
 
 export const emptyArchive = () => ({
