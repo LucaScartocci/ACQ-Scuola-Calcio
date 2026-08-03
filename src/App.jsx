@@ -10,6 +10,7 @@ import ExerciseModal from './components/ExerciseModal'
 import Matches from './components/Matches'
 import DocumentLibrary from './components/DocumentLibrary'
 import Modal from './components/Modal'
+import UserManagement from './components/UserManagement'
 import { removeCloudFile, uploadCloudFile } from './lib/storage'
 import './styles.css'
 
@@ -35,6 +36,9 @@ export default function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [toast, setToast] = useState('')
+  const [profile, setProfile] = useState(null)
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [usersOpen, setUsersOpen] = useState(false)
   const saveTimer = useRef(null)
   const applyingRemote = useRef(false)
   const undoStack = useRef([])
@@ -76,6 +80,49 @@ export default function App() {
     await installPrompt.prompt()
     setInstallPrompt(null)
   }
+
+  const role = profile?.role || 'collaborator'
+  const isDirector = role === 'director'
+  const isCoordinator = role === 'coordinator'
+  const isCoach = role === 'coach'
+  const isCollaborator = role === 'collaborator'
+  const canWrite = Boolean(profile?.active) && !isCollaborator
+  const canDelete = Boolean(profile?.active) && (isDirector || isCoordinator)
+  const canManageUsers = Boolean(profile?.active) && isDirector
+  const canRate = Boolean(profile?.active) && (isDirector || isCoordinator)
+  const assignedCategories = useMemo(() => {
+    if (!profile) return []
+    if (isDirector || isCoordinator) return CATEGORIES
+    return Array.isArray(profile.categories) ? profile.categories : []
+  }, [profile, isDirector, isCoordinator])
+  const profileCoach = upper(profile?.coach_name || profile?.last_name || '')
+  const visibleCategories = assignedCategories.length ? assignedCategories : (isDirector || isCoordinator ? CATEGORIES : [])
+
+  async function loadProfile() {
+    if (!auth?.user) return
+    setProfileLoading(true)
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', auth.user.id)
+      .maybeSingle()
+    setProfileLoading(false)
+    if (error) {
+      console.error(error)
+      setProfile(null)
+      setStatus('PROFILO UTENTE NON DISPONIBILE')
+      return
+    }
+    setProfile(data)
+    if (data && data.active === false) {
+      setStatus('ACCOUNT SOSPESO')
+    }
+  }
+
+  useEffect(() => {
+    if (auth?.user) loadProfile()
+    else setProfile(null)
+  }, [auth?.user?.id])
 
   useEffect(() => {
     if (!auth) return
@@ -123,7 +170,7 @@ export default function App() {
   }, [auth])
 
   useEffect(() => {
-    if (!auth || !hydrated || applyingRemote.current) return
+    if (!auth || !hydrated || applyingRemote.current || !canWrite) return
     localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(archive))
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
@@ -138,7 +185,7 @@ export default function App() {
       if(error) console.error(error)
     }, 700)
     return () => clearTimeout(saveTimer.current)
-  }, [archive, auth, hydrated])
+  }, [archive, auth, hydrated, canWrite])
 
   useEffect(() => {
     if (!auth || !hydrated || !isOnline) return
@@ -151,7 +198,7 @@ export default function App() {
       const nextRaw = typeof updater === 'function' ? updater(previous) : updater
       const next = normalizeArchive({
         ...nextRaw,
-        audit: [...(nextRaw.audit || []), makeAuditEntry(action, details)].slice(-200),
+        audit: [...(nextRaw.audit || []), makeAuditEntry(action, details, profile || { email: auth?.user?.email })].slice(-200),
         updatedAt: new Date().toISOString(),
       })
       if (JSON.stringify(previous) === JSON.stringify(next)) return previous
@@ -160,7 +207,7 @@ export default function App() {
       redoStack.current = []
       return next
     })
-  }, [])
+  }, [profile, auth])
 
   const undo = useCallback(() => {
     if (!undoStack.current.length) { showToast('NESSUNA OPERAZIONE DA ANNULLARE'); return }
@@ -195,12 +242,19 @@ export default function App() {
   }, [undo, redo])
 
   const sessionById = useMemo(() => new Map(archive.sessions.map(s => [s.id, s])), [archive.sessions])
-  const categorySessions = useMemo(() => archive.sessions.filter(s => (!selectedCategory || s.category === selectedCategory) && (!coach || s.coach === coach)), [archive.sessions, selectedCategory, coach])
+  const categorySessions = useMemo(() => archive.sessions.filter(s =>
+    visibleCategories.includes(s.category)
+    && (!selectedCategory || s.category === selectedCategory)
+    && (!coach || s.coach === coach)
+    && (!isCoach || !profileCoach || s.coach === profileCoach)
+  ), [archive.sessions, selectedCategory, coach, visibleCategories, isCoach, profileCoach])
   const filteredExercises = useMemo(() => {
     let list = archive.exercises.filter(e => {
       const linkedSession = sessionById.get(e.sessionId)
-      return (!selectedCategory || e.category === selectedCategory)
+      return visibleCategories.includes(e.category)
+        && (!selectedCategory || e.category === selectedCategory)
         && (!coach || linkedSession?.coach === coach)
+        && (!isCoach || !profileCoach || linkedSession?.coach === profileCoach)
         && (!phase || e.phase === phase)
         && (!rating || Number(e.rating) === Number(rating))
     })
@@ -213,7 +267,7 @@ export default function App() {
     if(sort==='players') list.sort((a,b)=>(b.players||0)-(a.players||0))
     if(sort==='recent') list.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))
     return list
-  },[archive.exercises,selectedCategory,coach,phase,rating,search,sort,sessionById])
+  },[archive.exercises,selectedCategory,coach,phase,rating,search,sort,sessionById,visibleCategories,isCoach,profileCoach])
   const visibleSessions = categorySessions.filter(s => !search || upper([s.coach,s.objective].join(' ')).includes(upper(search)) || filteredExercises.some(e=>e.sessionId===s.id))
 
   useEffect(() => {
@@ -277,12 +331,16 @@ export default function App() {
   }
 
   function saveSession(item) {
+    if (!canWrite) { window.alert('IL TUO RUOLO NON CONSENTE DI SALVARE SESSIONI.'); return }
+    if (!visibleCategories.includes(item.category)) { window.alert('CATEGORIA NON AUTORIZZATA.'); return }
+    if (isCoach && profileCoach && upper(item.coach) !== profileCoach) { window.alert('PUOI CREARE SESSIONI SOLTANTO PER IL TUO PROFILO ALLENATORE.'); return }
     const exists = archive.sessions.some(s => s.id === item.id)
     commit(a => ({...a,sessions:exists?a.sessions.map(s=>s.id===item.id?item:s):[...a.sessions,item]}), exists ? 'MODIFICA SESSIONE' : 'CREA SESSIONE', item.coach)
     setSessionModal(null)
   }
 
   function deleteSession(id) {
+    if (!canDelete) { window.alert('SOLO DIRETTORE E COORDINATORE POSSONO ELIMINARE LE SESSIONI.'); return }
     const session = archive.sessions.find(s => s.id === id)
     const count = archive.exercises.filter(e => e.sessionId === id).length
     if(!confirm(`ELIMINARE LA SESSIONE E LE ${count} ESERCITAZIONI AL SUO INTERNO?`)) return
@@ -291,6 +349,7 @@ export default function App() {
   }
 
   async function saveExercise(item, initial) {
+    if (!canWrite) { window.alert('IL TUO RUOLO NON CONSENTE DI SALVARE ESERCITAZIONI.'); throw new Error('PERMESSO NEGATO') }
     const linkedSession = archive.sessions.find(session => String(session.id) === String(item.sessionId))
     if (!linkedSession) {
       window.alert('LA SESSIONE COLLEGATA NON È STATA TROVATA. CHIUDI LA FINESTRA, RICARICA LA PAGINA E RIPROVA.')
@@ -299,6 +358,10 @@ export default function App() {
 
     const previous = archive.exercises.find(exercise => String(exercise.id) === String(item.id))
     const ratingChanged = Number(item.rating || 0) !== Number((previous && previous.rating) || 0)
+    if (ratingChanged && Number(item.rating || 0) > 0 && !canRate) {
+      window.alert('SOLO DIRETTORE E COORDINATORE POSSONO MODIFICARE LA VALUTAZIONE.')
+      throw new Error('VALUTAZIONE NON AUTORIZZATA')
+    }
     if (ratingChanged && Number(item.rating || 0) > 0 && !authorize('PASSWORD PER SALVARE LA VALUTAZIONE:')) {
       throw new Error('VALUTAZIONE NON AUTORIZZATA')
     }
@@ -343,7 +406,7 @@ export default function App() {
     const nextArchive = normalizeArchive({
       ...archive,
       exercises: nextExercises,
-      audit: [...(archive.audit || []), makeAuditEntry(exists ? 'MODIFICA ESERCITAZIONE' : 'CREA ESERCITAZIONE', clean.title)].slice(-200),
+      audit: [...(archive.audit || []), makeAuditEntry(exists ? 'MODIFICA ESERCITAZIONE' : 'CREA ESERCITAZIONE', clean.title, profile || { email: auth?.user?.email })].slice(-200),
       updatedAt: new Date().toISOString(),
     })
 
@@ -357,6 +420,7 @@ export default function App() {
   }
 
   async function deleteExercise(id) {
+    if (!canDelete) { window.alert('SOLO DIRETTORE E COORDINATORE POSSONO ELIMINARE ESERCITAZIONI.'); return }
     const item = archive.exercises.find(e => e.id === id)
     if(!confirm('ELIMINARE QUESTA ESERCITAZIONE?')) return
     if(!authorize("PASSWORD PER ELIMINARE L'ESERCITAZIONE:")) return
@@ -365,10 +429,12 @@ export default function App() {
   }
 
   function addDocuments(type, items){
+    if (!canWrite) { window.alert('IL TUO RUOLO È IN SOLA LETTURA.'); return }
     commit(a=>({...a,documents:{...a.documents,[type]:[...(a.documents[type]||[]),...items]}}),'CARICA DOCUMENTI',type)
   }
 
   async function deleteDocument(type,item){
+    if (!canDelete) { window.alert('SOLO DIRETTORE E COORDINATORE POSSONO ELIMINARE DOCUMENTI.'); return }
     if(!authorize('PASSWORD PER ELIMINARE IL FILE:')) return
     try{ if(item.storagePath) await removeCloudFile(item.storagePath) }catch(error){console.error(error);alert('FILE RIMOSSO DALL’ARCHIVIO, MA NON DALLO STORAGE.')}
     commit(a=>({...a,documents:{...a.documents,[type]:(a.documents[type]||[]).filter(x=>x.id!==item.id)}}),'ELIMINA DOCUMENTO',item.title)
@@ -412,26 +478,34 @@ export default function App() {
 
   if(auth===undefined) return <div className="loading">CARICAMENTO…</div>
   if(!auth) return <Login />
+  if(profileLoading || !profile) return <div className="loading">CARICAMENTO PROFILO UTENTE…</div>
+  if(profile.active === false) return <div className="fatal-error"><h1>ACCOUNT SOSPESO</h1><p>CONTATTA IL DIRETTORE TECNICO.</p><button onClick={()=>supabase.auth.signOut()}>ESCI</button></div>
 
   return <div className="app-shell">
-    <header className="hero"><div><small>ARCHIVIO METODOLOGICO ACQUACETOSA</small><h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1></div><img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`}/><b>2026/27</b><nav><button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button><button onClick={()=>setDocumentModal('meetings')}>RIUNIONI TECNICHE</button><button onClick={()=>setDocumentModal('teaching')}>MATERIALE DIDATTICO</button><button className="glass" onClick={exportArchive}>ESPORTA</button><button className="glass" onClick={()=>fileInput.current?.click()}>IMPORTA</button>{legacyArchive && <button className="glass" onClick={migrateLegacy}>MIGRA V23</button>}<button className="glass" onClick={installApp}>INSTALLA APP</button><button className="glass" onClick={()=>supabase.auth.signOut()}>ESCI</button><input ref={fileInput} hidden type="file" accept="application/json,.json" onChange={e=>importArchive(e.target.files?.[0])}/></nav></header>
-    <section className="history-bar"><button onClick={undo} disabled={!undoStack.current.length}>↶ ANNULLA</button><button onClick={redo} disabled={!redoStack.current.length}>↷ RIPRISTINA</button><button onClick={()=>setAuditOpen(true)}>CRONOLOGIA</button><span>⌘Z / CTRL+Z · CRONOLOGIA FINO A 100 MODIFICHE</span></section>
-    <section className="filters"><input placeholder="CERCA PER TITOLO, OBIETTIVO O PAROLA CHIAVE…" value={search} onChange={e=>setSearch(e.target.value)}/><select value={coach} onChange={e=>setCoach(e.target.value)}><option value="">ALLENATORI</option>{COACHES.map(v=><option key={v}>{v}</option>)}</select><select value={selectedCategory} onChange={e=>setSelectedCategory(e.target.value)}><option value="">CATEGORIE</option>{CATEGORIES.map(v=><option key={v}>{v}</option>)}</select><select value={rating} onChange={e=>setRating(e.target.value)}><option value="">VALUTAZIONI</option>{[1,2,3,4,5].map(v=><option key={v} value={v}>{v} STELLE</option>)}</select><select value={phase} onChange={e=>setPhase(e.target.value)}><option value="">FASE ALLENAMENTO</option>{PHASES.map(v=><option key={v}>{v}</option>)}</select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="recent">PIÙ RECENTI</option><option value="az">A-Z</option><option value="players">N° GIOCATORI</option></select><button className="reset-filters" onClick={resetFilters}>AZZERA FILTRI</button></section>
-    <section className="category-strip"><button className={!selectedCategory?'active':''} onClick={()=>setSelectedCategory('')}><span>▦</span><b>ARCHIVIO COMPLETO</b><small>{archive.sessions.length}SS / {archive.exercises.length}ES</small></button>{CATEGORIES.map(c=>{const ss=archive.sessions.filter(s=>s.category===c).length,es=archive.exercises.filter(e=>e.category===c).length;return <button key={c} className={selectedCategory===c?'active':''} onClick={()=>setSelectedCategory(c)}><span>⚽</span><b>{c}</b><small>{ss}SS / {es}ES</small></button>})}</section>
+    <header className="hero"><div><small>ARCHIVIO METODOLOGICO ACQUACETOSA</small><h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1></div><img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`}/><b>2026/27</b><nav>{canWrite && <button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button>}<button onClick={()=>setDocumentModal('meetings')}>RIUNIONI TECNICHE</button><button onClick={()=>setDocumentModal('teaching')}>MATERIALE DIDATTICO</button><button className="glass" onClick={exportArchive}>ESPORTA</button><button className="glass" onClick={()=>fileInput.current?.click()}>IMPORTA</button>{legacyArchive && <button className="glass" onClick={migrateLegacy}>MIGRA V23</button>}<button className="glass" onClick={installApp}>INSTALLA APP</button>{canManageUsers && <button className="glass" onClick={()=>setUsersOpen(true)}>UTENTI</button>}<button className="glass" onClick={()=>supabase.auth.signOut()}>ESCI</button><input ref={fileInput} hidden type="file" accept="application/json,.json" onChange={e=>importArchive(e.target.files?.[0])}/></nav></header>
+    <section className="profile-bar">
+      <div className="profile-avatar">{(profile.first_name?.[0] || auth.user.email?.[0] || 'U')}{profile.last_name?.[0] || ''}</div>
+      <div><b>{upper([profile.first_name,profile.last_name].filter(Boolean).join(' ') || auth.user.email)}</b><span>{upper(profile.role)}{profile.coach_name ? ` · ${profile.coach_name}` : ''}</span></div>
+      <div className="profile-categories">{visibleCategories.map(category=><span key={category}>{category}</span>)}</div>
+    </section>
+    <section className="history-bar">{canWrite && <button onClick={undo} disabled={!undoStack.current.length}>↶ ANNULLA</button>}{canWrite && <button onClick={redo} disabled={!redoStack.current.length}>↷ RIPRISTINA</button>}<button onClick={()=>setAuditOpen(true)}>CRONOLOGIA</button><span>⌘Z / CTRL+Z · CRONOLOGIA FINO A 100 MODIFICHE</span></section>
+    <section className="filters"><input placeholder="CERCA PER TITOLO, OBIETTIVO O PAROLA CHIAVE…" value={search} onChange={e=>setSearch(e.target.value)}/><select value={coach} onChange={e=>setCoach(e.target.value)}><option value="">ALLENATORI</option>{COACHES.map(v=><option key={v}>{v}</option>)}</select><select value={selectedCategory} onChange={e=>setSelectedCategory(e.target.value)}><option value="">CATEGORIE</option>{visibleCategories.map(v=><option key={v}>{v}</option>)}</select><select value={rating} onChange={e=>setRating(e.target.value)}><option value="">VALUTAZIONI</option>{[1,2,3,4,5].map(v=><option key={v} value={v}>{v} STELLE</option>)}</select><select value={phase} onChange={e=>setPhase(e.target.value)}><option value="">FASE ALLENAMENTO</option>{PHASES.map(v=><option key={v}>{v}</option>)}</select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="recent">PIÙ RECENTI</option><option value="az">A-Z</option><option value="players">N° GIOCATORI</option></select><button className="reset-filters" onClick={resetFilters}>AZZERA FILTRI</button></section>
+    <section className="category-strip"><button className={!selectedCategory?'active':''} onClick={()=>setSelectedCategory('')}><span>▦</span><b>ARCHIVIO COMPLETO</b><small>{archive.sessions.length}SS / {archive.exercises.length}ES</small></button>{visibleCategories.map(c=>{const ss=archive.sessions.filter(s=>s.category===c).length,es=archive.exercises.filter(e=>e.category===c).length;return <button key={c} className={selectedCategory===c?'active':''} onClick={()=>setSelectedCategory(c)}><span>⚽</span><b>{c}</b><small>{ss}SS / {es}ES</small></button>})}</section>
     <nav className="view-tabs"><button className={view==='sessions'?'active':''} onClick={()=>setView('sessions')}>SESSIONI ALLENAMENTO</button><button className={view==='library'?'active':''} onClick={()=>setView('library')}>LIBRERIA ESERCITAZIONI</button>{selectedCategory&&<button className={view==='matches'?'active':''} onClick={()=>setView('matches')}>PARTITE</button>}</nav>
-    {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}'</p></div><div><button onClick={()=>openNewExercise(s)}>＋ ESERCITAZIONE</button><button className="soft" onClick={()=>setSessionModal(s)}>MODIFICA</button><button className="soft" onClick={()=>deleteSession(s.id)}>ELIMINA</button></div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
-    {view==='library' && <main><div className="section-title"><div><h2>LIBRERIA ESERCITAZIONI</h2><p>TUTTE LE ESERCITAZIONI DELL’ARCHIVIO.</p></div><b>{filteredExercises.length} ESERCITAZIONI</b></div>{!filteredExercises.length && <EmptyState title="NESSUNA ESERCITAZIONE TROVATA" text="MODIFICA I FILTRI O AGGIUNGI UNA ESERCITAZIONE."/>}<div className="exercise-grid library">{filteredExercises.map(e=>{const s=archive.sessions.find(x=>x.id===e.sessionId);return <ExerciseCard e={e} key={e.id} onEdit={()=>s&&setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>})}</div></main>}
-    {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} onChange={items=>commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory)}/></main>}
+    {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}'</p></div><div>{canWrite && <button onClick={()=>openNewExercise(s)}>＋ ESERCITAZIONE</button>}{canWrite && <button className="soft" onClick={()=>setSessionModal(s)}>MODIFICA</button>}{canDelete && <button className="soft" onClick={()=>deleteSession(s.id)}>ELIMINA</button>}</div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
+    {view==='library' && <main><div className="section-title"><div><h2>LIBRERIA ESERCITAZIONI</h2><p>TUTTE LE ESERCITAZIONI DELL’ARCHIVIO.</p></div><b>{filteredExercises.length} ESERCITAZIONI</b></div>{!filteredExercises.length && <EmptyState title="NESSUNA ESERCITAZIONE TROVATA" text="MODIFICA I FILTRI O AGGIUNGI UNA ESERCITAZIONE."/>}<div className="exercise-grid library">{filteredExercises.map(e=>{const s=archive.sessions.find(x=>x.id===e.sessionId);return <ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>s&&setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>})}</div></main>}
+    {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} readOnly={!canWrite} onChange={items=>{if(!canWrite)return;commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory)}}/></main>}
     <div className="build-badge">HOTFIX 2</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
     {toast && <div className="action-toast">{toast}</div>}
     {auditOpen && <AuditModal items={archive.audit||[]} onClose={()=>setAuditOpen(false)}/>}
-    {sessionModal && <SessionModal initial={sessionModal.id?sessionModal:null} onSave={saveSession} onClose={()=>setSessionModal(null)}/>} 
+    {sessionModal && <SessionModal initial={sessionModal.id?sessionModal:null} allowedCategories={visibleCategories} fixedCoach={isCoach?profileCoach:''} canChooseCoach={!isCoach} onSave={saveSession} onClose={()=>setSessionModal(null)}/>} 
     {exerciseModal && <ExerciseModal session={exerciseModal.session} initial={exerciseModal.initial} onSave={saveExercise} onClose={()=>setExerciseModal(null)}/>} 
-    {documentModal && <DocumentLibrary type={documentModal} items={archive.documents[documentModal]||[]} onAdd={items=>addDocuments(documentModal,items)} onDelete={item=>deleteDocument(documentModal,item)} onClose={()=>setDocumentModal(null)}/>} 
+    {usersOpen && <UserManagement currentProfile={profile} onChanged={loadProfile} onClose={()=>setUsersOpen(false)}/>}
+    {documentModal && <DocumentLibrary type={documentModal} items={archive.documents[documentModal]||[]} readOnly={!canWrite} onAdd={items=>addDocuments(documentModal,items)} onDelete={item=>deleteDocument(documentModal,item)} onClose={()=>setDocumentModal(null)}/>} 
   </div>
 }
 
-function ExerciseCard({e,onEdit,onDelete}){return <article className="exercise-card"><div className="exercise-cover" style={e.image?{backgroundImage:`linear-gradient(rgba(5,25,50,.28),rgba(5,25,50,.55)),url(${e.image})`}:{}}><div><span>{e.category}</span><span>{e.phase}</span></div><h3>{e.title}</h3></div><div className="exercise-body"><div className="stats"><div><small>GIOCATORI</small><b>{e.players}</b></div><div><small>DURATA</small><b>{e.duration}'</b></div><div><small>SPAZIO</small><b>{e.space||'—'}</b></div></div><div className="rating">{'★'.repeat(e.rating||0)}{'☆'.repeat(5-(e.rating||0))}</div><p>{e.objective}</p><footer><button onClick={onEdit}>MODIFICA</button><button className="danger" onClick={onDelete}>ELIMINA</button></footer></div></article>}
+function ExerciseCard({e,onEdit,onDelete,canWrite,canDelete}){return <article className="exercise-card"><div className="exercise-cover" style={e.image?{backgroundImage:`linear-gradient(rgba(5,25,50,.28),rgba(5,25,50,.55)),url(${e.image})`}:{}}><div><span>{e.category}</span><span>{e.phase}</span></div><h3>{e.title}</h3></div><div className="exercise-body"><div className="stats"><div><small>GIOCATORI</small><b>{e.players}</b></div><div><small>DURATA</small><b>{e.duration}'</b></div><div><small>SPAZIO</small><b>{e.space||'—'}</b></div></div><div className="rating">{'★'.repeat(e.rating||0)}{'☆'.repeat(5-(e.rating||0))}</div><p>{e.objective}</p><footer>{canWrite && <button onClick={onEdit}>MODIFICA</button>}{canDelete && <button className="danger" onClick={onDelete}>ELIMINA</button>}</footer></div></article>}
 
 
 function EmptyState({title,text}) {
@@ -444,7 +518,7 @@ function AuditModal({items,onClose}) {
     <div className="audit-list">
       {ordered.length ? ordered.map((item,index)=><article key={`${item.at}-${index}`}>
         <b>{item.action||'OPERAZIONE'}</b>
-        <span>{item.details||'—'}</span>
+        <span>{item.details||'—'}{item.userName ? ` · ${item.userName}` : ''}</span>
         <small>{new Date(item.at||Date.now()).toLocaleString('it-IT')}</small>
       </article>) : <EmptyState title="NESSUNA OPERAZIONE REGISTRATA" text="LA CRONOLOGIA COMPARIRÀ QUI."/>}
     </div>

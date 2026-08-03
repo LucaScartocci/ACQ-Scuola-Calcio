@@ -23,7 +23,7 @@ const fileIcon = type => {
   return '📎'
 }
 
-export default function DocumentLibrary({ type, items, onAdd, onDelete, onClose }) {
+export default function DocumentLibrary({ type, items, onAdd, onDelete, onClose, readOnly=false }) {
   const [title,setTitle] = useState('')
   const [search,setSearch] = useState('')
   const [files,setFiles] = useState([])
@@ -58,18 +58,18 @@ export default function DocumentLibrary({ type, items, onAdd, onDelete, onClose 
   return <Modal title={heading} onClose={onClose} wide>
     <div className="document-library">
       <p className="document-subtitle">{subtitle}</p>
-      <section className="document-upload">
+      {!readOnly && <section className="document-upload">
         <label>TITOLO / DESCRIZIONE<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="ES. RIUNIONE STAFF SETTEMBRE"/></label>
         <label>FILE<input ref={inputRef} type="file" multiple onChange={e=>setFiles([...e.target.files])}/></label>
         <button onClick={submit} disabled={busy}>{busy?'CARICAMENTO…':'＋ CARICA NEL CLOUD'}</button>
-      </section>
+      </section>}
       {files.length>0 && <div className="pending-files">{files.map(f=><span key={f.name}>{f.name} · {sizeLabel(f.size)}</span>)}</div>}
       <input className="document-search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="CERCA NELLA LIBRERIA…"/>
       <div className="document-grid">
         {visible.map(item=><article className="document-card" key={item.id}>
           <div className="document-icon">{fileIcon(item.type)}</div>
           <div className="document-info"><h3>{item.title}</h3><p>{item.name}</p><small>{sizeLabel(item.size||0)} · {new Date(item.createdAt).toLocaleDateString('it-IT')}</small></div>
-          <footer><a href={item.url} target="_blank" rel="noreferrer">APRI</a><a href={item.url} download={item.name}>SCARICA</a><button onClick={()=>onDelete(item)}>ELIMINA</button></footer>
+          <footer><a href={item.url} target="_blank" rel="noreferrer">APRI</a><a href={item.url} download={item.name}>SCARICA</a>{!readOnly && <button onClick={()=>onDelete(item)}>ELIMINA</button>}</footer>
         </article>)}
       </div>
       {!visible.length && <div className="documents-empty">NESSUN FILE PRESENTE</div>}

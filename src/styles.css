@@ -62,3 +62,17 @@
 .fatal-error button{justify-self:center;min-height:48px;padding:12px 18px;border:0;border-radius:12px;background:#fff;color:#071b34;font-weight:900}
 
 .build-badge{position:fixed;right:12px;top:12px;z-index:5000;padding:5px 8px;border-radius:999px;background:#071b34;color:#fff;font-size:9px;font-weight:900;opacity:.7}
+
+/* FASE 3A: UTENTI, RUOLI E PERMESSI */
+.profile-bar{display:flex;align-items:center;gap:12px;margin:14px 0;padding:12px 16px;border:1px solid #d5e2f1;border-radius:16px;background:#fff;box-shadow:0 8px 22px rgba(16,32,51,.05)}
+.profile-avatar,.user-avatar{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;background:linear-gradient(135deg,#071b34,#0f5cc0);color:#fff;font-weight:900}
+.profile-bar>div:nth-child(2){display:grid;gap:2px}.profile-bar span{color:#6e7d91;font-size:11px;font-weight:800}
+.profile-categories{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}.profile-categories span{padding:6px 8px;border-radius:999px;background:#edf4fd;color:#0c4a91;font-size:9px;font-weight:900}
+.users-manager{padding:20px 24px 26px}.users-info{display:grid;gap:5px;padding:14px;border-radius:14px;background:#eaf3ff;color:#123a66}.users-info span{font-size:11px;font-weight:750}
+.users-list{display:flex;flex-direction:column;gap:14px;margin-top:16px}.user-card{padding:16px;border:1px solid #d7e2ef;border-radius:18px;background:#fff;box-shadow:0 8px 22px rgba(16,32,51,.05)}
+.user-card header{display:flex;align-items:center;gap:11px}.user-card header>div:nth-child(2){display:grid;gap:3px}.user-card header span{color:#718096;font-size:11px}.user-active{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:10px;font-weight:900}
+.user-fields{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.user-fields label{font-size:10px;font-weight:900;color:#6b7a8e}.user-fields input,.user-fields select{width:100%;min-height:43px;margin-top:6px;border:1px solid #d1deec;border-radius:11px;padding:9px}
+.user-categories{margin-top:14px}.user-categories>b{font-size:10px;color:#6b7a8e}.user-categories>div{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.user-categories button{border:1px solid #cbd8e7;border-radius:999px;padding:7px 10px;background:#fff;color:#53657c;font-size:9px;font-weight:900}.user-categories button.active{background:#0f5cc0;color:#fff;border-color:#0f5cc0}
+.user-card footer{display:flex;justify-content:flex-end;margin-top:14px}.user-card footer button{min-height:42px;border:0;border-radius:11px;padding:10px 14px;background:#071b34;color:#fff;font-weight:900}
+@media(max-width:850px){.user-fields{grid-template-columns:1fr 1fr}.profile-bar{align-items:flex-start;flex-wrap:wrap}.profile-categories{width:100%;margin-left:56px}}
+@media(max-width:650px){.users-manager{padding:14px}.user-fields{grid-template-columns:1fr}.user-card header{align-items:flex-start}.user-active{margin-left:0}.profile-categories{margin-left:0}.profile-bar{display:grid;grid-template-columns:auto 1fr}.profile-categories{grid-column:1/-1}}

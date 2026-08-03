@@ -105,8 +105,15 @@ export const normalizeArchive = (value) => {
 export const upper = value => String(value ?? '').toUpperCase()
 export const uid = () => safeId('id')
 
-export const makeAuditEntry = (action, details = '') => ({
-  id: safeId('audit'), action: upper(action), details: upper(details), at: new Date().toISOString()
+export const makeAuditEntry = (action, details = '', actor = {}) => ({
+  id: safeId('audit'),
+  action: upper(action),
+  details: upper(details),
+  at: new Date().toISOString(),
+  userId: actor.id || '',
+  userEmail: actor.email || '',
+  userName: upper([actor.first_name, actor.last_name].filter(Boolean).join(' ') || actor.email || ''),
+  userRole: upper(actor.role || ''),
 })
 
 export function readLegacyArchive() {

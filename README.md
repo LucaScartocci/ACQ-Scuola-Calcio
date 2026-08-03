@@ -1,28 +1,34 @@
-# ACQ Scuola Calcio v24 Cloud · Fase 2D
-
-Questa release completa la Fase 2.
+# ACQ Scuola Calcio v24 Cloud · Fase 3A
 
 ## Novità
 
-- PWA installabile su iPad, iPhone, Android e computer
-- manifest, icone e service worker
-- apertura offline dell'app
-- copia locale automatica dell'ultimo archivio cloud
-- modifiche offline salvate localmente e inviate al ritorno della connessione
-- filtri correlati tra allenatore, categoria, fase, stelle e ricerca
-- filtro allenatore funzionante anche nella Libreria Esercitazioni
-- pulsante Azzera filtri
-- cronologia operazioni consultabile
-- layout ottimizzato per iPad verticale/orizzontale e iPhone
-- stati vuoti più chiari
-- controllo automatico della vista Partite quando viene rimossa la categoria
+- profili utente collegati a Supabase Auth
+- ruoli: Direttore Tecnico, Coordinatore, Allenatore, Collaboratore
+- categorie assegnate a ogni utente
+- allenatore associato al profilo
+- account attivo o sospeso
+- pannello Gestione utenti riservato al Direttore
+- Collaboratore in sola lettura
+- Allenatore limitato alle categorie assegnate e al proprio cognome
+- eliminazioni consentite soltanto a Direttore e Coordinatore
+- valutazioni consentite soltanto a Direttore e Coordinatore
+- audit con nome, email e ruolo di chi effettua la modifica
 
-## Aggiornamento
+## Installazione
 
-Caricare tutti i file sul repository GitHub sostituendo quelli esistenti.
-Non servono nuove query SQL rispetto alla Fase 2B.
+1. Eseguire `supabase_phase3a.sql` in Supabase → SQL Editor.
+2. Caricare tutti i file del progetto su GitHub sovrascrivendo quelli esistenti.
+3. Attendere il deploy verde.
+4. Accedere con `lucascartocci@gmail.com`: lo script assegna automaticamente il ruolo Direttore Tecnico.
 
-Dopo il deploy, su iPad/iPhone:
-Safari → Condividi → Aggiungi alla schermata Home.
+Per aggiungere altri utenti:
+Supabase → Authentication → Users → Add user.
+Poi entra nel sito come Direttore → UTENTI e configura ruolo, categorie e allenatore associato.
 
-Nota offline: l'app può aprirsi e conservare modifiche temporanee senza rete. Immagini e documenti nuovi richiedono comunque una connessione per essere caricati su Supabase Storage.
+
+## Ordine obbligatorio
+
+1. Eseguire prima `supabase_phase3a.sql`.
+2. Verificare che la query termini con `Success`.
+3. Solo dopo caricare i file su GitHub.
+4. Effettuare logout e login per ricaricare il nuovo profilo.
