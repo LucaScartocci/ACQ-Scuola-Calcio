@@ -43,9 +43,9 @@ export default function PlayerDocumentsManager({ players, playerDocuments, onCha
         uploadedAt:new Date().toISOString(),
         uploadedBy:upper(currentUser || ''),
       }
-      onChange(selectedPlayer.id, [...documents,item], 'CARICA DOCUMENTO TESSERATO', `${selectedPlayer.lastName} ${selectedPlayer.firstName} · ${documentType}`)
+      await onChange(selectedPlayer.id, [...documents,item], 'CARICA DOCUMENTO TESSERATO', `${selectedPlayer.lastName} ${selectedPlayer.firstName} · ${documentType}`)
       setExpiryDate('')
-      window.alert('DOCUMENTO CARICATO CORRETTAMENTE.')
+      window.alert('DOCUMENTO CARICATO E SALVATO NEL CLOUD.')
     } catch (error) {
       console.error(error)
       window.alert('CARICAMENTO NON RIUSCITO: ' + (error.message || 'ERRORE'))
@@ -59,7 +59,7 @@ export default function PlayerDocumentsManager({ players, playerDocuments, onCha
     setBusy(true)
     try {
       if (item.storagePath) await removeCloudFile(item.storagePath)
-      onChange(selectedPlayer.id, documents.filter(document => document.id !== item.id), 'ELIMINA DOCUMENTO TESSERATO', `${selectedPlayer.lastName} ${selectedPlayer.firstName} · ${item.documentType}`)
+      await onChange(selectedPlayer.id, documents.filter(document => document.id !== item.id), 'ELIMINA DOCUMENTO TESSERATO', `${selectedPlayer.lastName} ${selectedPlayer.firstName} · ${item.documentType}`)
     } catch (error) {
       console.error(error)
       window.alert('ELIMINAZIONE NON RIUSCITA.')

@@ -976,3 +976,11 @@
     grid-template-columns:1fr;
   }
 }
+
+/* FASE 6D · SALVATAGGI SEGRETERIA AFFIDABILI */
+.attendance-modal button:disabled,
+.secretary-file-button:has(input:disabled),
+.secretary-doc-list button:disabled{
+  opacity:.55;
+  cursor:wait;
+}

@@ -6,6 +6,7 @@ export default function AttendanceModal({ session, players, attendance, onSave, 
   const [categoryFilter, setCategoryFilter] = useState(session.category || '')
   const [presentIds, setPresentIds] = useState(new Set(attendance?.presentIds || []))
   const [query, setQuery] = useState('')
+  const [busy, setBusy] = useState(false)
 
   const activePlayers = useMemo(() =>
     players
@@ -103,8 +104,14 @@ export default function AttendanceModal({ session, players, attendance, onSave, 
       </section>
 
       <footer>
-        <button type="button" className="ghost" onClick={onClose}>ANNULLA</button>
-        <button type="button" onClick={()=>onSave([...presentIds])} disabled={!activePlayers.length}>SALVA PRESENZE</button>
+        <button type="button" className="ghost" onClick={onClose} disabled={busy}>ANNULLA</button>
+        <button type="button" onClick={async()=>{
+          if (busy) return
+          setBusy(true)
+          try { await onSave([...presentIds]) }
+          catch (error) { console.error(error); window.alert('SALVATAGGIO PRESENZE NON RIUSCITO: ' + (error.message || 'ERRORE CLOUD')) }
+          finally { setBusy(false) }
+        }} disabled={!activePlayers.length || busy}>{busy?'SALVATAGGIO…':'SALVA PRESENZE'}</button>
       </footer>
     </div>
   </Modal>

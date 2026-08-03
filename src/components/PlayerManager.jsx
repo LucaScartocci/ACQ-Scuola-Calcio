@@ -32,7 +32,7 @@ export default function PlayerManager({ players, onSave, onClose }) {
     })
   }
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault()
     if (!form.firstName.trim() || !form.lastName.trim()) {
       window.alert('INSERISCI NOME E COGNOME DEL TESSERATO.')
@@ -47,7 +47,7 @@ export default function PlayerManager({ players, onSave, onClose }) {
       active:Boolean(form.active),
       createdAt: editing ? players.find(p=>p.id===editing)?.createdAt || Date.now() : Date.now(),
     }
-    onSave(item)
+    await onSave(item)
     setCategory(item.category)
     resetForm(item.category)
   }

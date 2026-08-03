@@ -599,66 +599,135 @@ export default function App() {
     setExerciseModal({ session: { ...session } })
   }
 
-  function savePlayerDocuments(playerId, documents, action, details) {
+  async function savePlayerDocuments(playerId, documents, action, details) {
     if (!isDirector && !isSecretary) {
       window.alert('PERMESSO NEGATO.')
-      return
+      throw new Error('PERMESSO NEGATO')
     }
-    const player=archive.players.find(item=>item.id===playerId)
-    commit(
-      current=>({...current,playerDocuments:{...(current.playerDocuments||{}),[playerId]:documents}}),
-      action,
-      details,
-      {objectType:'DOCUMENTO TESSERATO',objectId:playerId,category:player?.category||''}
+
+    const currentArchive = archiveRef.current
+    const player = currentArchive.players.find(item => item.id === playerId)
+    const nextArchive = normalizeArchive({
+      ...currentArchive,
+      playerDocuments:{
+        ...(currentArchive.playerDocuments || {}),
+        [playerId]:documents,
+      },
+      audit:[
+        ...(currentArchive.audit || []),
+        makeAuditEntry(action, details, profile || {email:auth?.user?.email})
+      ].slice(-200),
+      updatedAt:new Date().toISOString(),
+    })
+
+    await persistArchiveImmediately(
+      nextArchive,
+      'DOCUMENTI TESSERATO SALVATI',
+      'DOCUMENTI SALVATI IN LOCALE'
     )
+
+    await writeAuditLog(action, details, {
+      objectType:'DOCUMENTO TESSERATO',
+      objectId:playerId,
+      category:player?.category || '',
+    })
+
     showToast('DOCUMENTI TESSERATO AGGIORNATI')
+    return nextArchive
   }
 
-  function savePlayer(item) {
+  async function savePlayer(item) {
     if (!isDirector && !isSecretary) {
       window.alert('SOLO DIRETTORE E SEGRETARIO POSSONO GESTIRE I TESSERATI.')
-      return
+      throw new Error('PERMESSO NEGATO')
     }
-    const exists = archive.players.some(player => player.id === item.id)
-    commit(
-      current => ({
-        ...current,
-        players: exists
-          ? current.players.map(player => player.id === item.id ? item : player)
-          : [...current.players, item]
-      }),
+
+    const currentArchive = archiveRef.current
+    const exists = currentArchive.players.some(player => player.id === item.id)
+    const nextArchive = normalizeArchive({
+      ...currentArchive,
+      players:exists
+        ? currentArchive.players.map(player => player.id === item.id ? item : player)
+        : [...currentArchive.players,item],
+      audit:[
+        ...(currentArchive.audit || []),
+        makeAuditEntry(
+          exists ? 'MODIFICA TESSERATO' : 'CREA TESSERATO',
+          `${item.lastName} ${item.firstName}`,
+          profile || {email:auth?.user?.email}
+        )
+      ].slice(-200),
+      updatedAt:new Date().toISOString(),
+    })
+
+    await persistArchiveImmediately(
+      nextArchive,
+      exists ? 'TESSERATO AGGIORNATO' : 'TESSERATO INSERITO',
+      exists ? 'TESSERATO AGGIORNATO IN LOCALE' : 'TESSERATO INSERITO IN LOCALE'
+    )
+
+    await writeAuditLog(
       exists ? 'MODIFICA TESSERATO' : 'CREA TESSERATO',
       `${item.lastName} ${item.firstName}`,
       {objectType:'TESSERATO',objectId:item.id,category:item.category}
     )
+
     showToast(exists ? 'TESSERATO AGGIORNATO' : 'TESSERATO INSERITO')
+    return nextArchive
   }
 
-  function saveAttendance(session, presentIds) {
+  async function saveAttendance(session, presentIds) {
     if (!canWrite && !isSecretary) {
       window.alert('IL TUO RUOLO NON CONSENTE DI REGISTRARE LE PRESENZE.')
-      return
+      throw new Error('PERMESSO NEGATO')
     }
-    commit(
-      current => ({
-        ...current,
-        attendanceBySession:{
-          ...current.attendanceBySession,
-          [session.id]:{
-            sessionId:session.id,
-            category:session.category,
-            presentIds,
-            updatedAt:new Date().toISOString(),
-            updatedBy:upper([profile.first_name,profile.last_name].filter(Boolean).join(' ') || auth.user.email)
-          }
-        }
-      }),
-      'SALVA PRESENZE',
-      `${session.category} · ${presentIds.length} PRESENTI`,
-      {objectType:'PRESENZE',objectId:session.id,category:session.category,metadata:{presentCount:presentIds.length}}
+
+    const currentArchive = archiveRef.current
+    const record = {
+      sessionId:session.id,
+      category:session.category,
+      presentIds:[...new Set(presentIds.map(String))],
+      updatedAt:new Date().toISOString(),
+      updatedBy:upper([profile.first_name,profile.last_name].filter(Boolean).join(' ') || auth.user.email),
+    }
+
+    const nextArchive = normalizeArchive({
+      ...currentArchive,
+      attendanceBySession:{
+        ...(currentArchive.attendanceBySession || {}),
+        [session.id]:record,
+      },
+      audit:[
+        ...(currentArchive.audit || []),
+        makeAuditEntry(
+          'SALVA PRESENZE',
+          `${session.category} · ${record.presentIds.length} PRESENTI`,
+          profile || {email:auth?.user?.email}
+        )
+      ].slice(-200),
+      updatedAt:new Date().toISOString(),
+    })
+
+    await persistArchiveImmediately(
+      nextArchive,
+      'PRESENZE SALVATE',
+      'PRESENZE SALVATE IN LOCALE'
     )
+
+    await writeAuditLog(
+      'SALVA PRESENZE',
+      `${session.category} · ${record.presentIds.length} PRESENTI`,
+      {
+        objectType:'PRESENZE',
+        objectId:session.id,
+        category:session.category,
+        metadata:{presentCount:record.presentIds.length},
+      }
+    )
+
     setAttendanceSession(null)
     showToast('PRESENZE SALVATE')
+    return nextArchive
   }
 
   async function saveSession(item) {

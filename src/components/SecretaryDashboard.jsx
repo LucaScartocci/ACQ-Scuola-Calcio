@@ -66,6 +66,6 @@ export default function SecretaryDashboard({ archive, profile, status, isOnline,
     {documentsOpen&&<PlayerDocumentsManager players={archive.players} playerDocuments={archive.playerDocuments||{}} currentUser={[profile.first_name,profile.last_name].filter(Boolean).join(' ')} onChange={onSavePlayerDocuments} onClose={()=>setDocumentsOpen(false)}/>}
     {calendarsOpen&&<SecretaryCalendars matchesByCategory={archive.matchesByCategory} onClose={()=>setCalendarsOpen(false)}/>}
     {attendanceStatsOpen&&<AttendanceStatistics archive={archive} visibleCategories={CATEGORIES} onClose={()=>setAttendanceStatsOpen(false)}/>}
-    {attendanceSession&&<AttendanceModal session={attendanceSession} players={archive.players} attendance={archive.attendanceBySession[attendanceSession.id]} onSave={ids=>{onSaveAttendance(attendanceSession,ids);setAttendanceSession(null)}} onClose={()=>setAttendanceSession(null)}/>}
+    {attendanceSession&&<AttendanceModal session={attendanceSession} players={archive.players} attendance={archive.attendanceBySession[attendanceSession.id]} onSave={async ids=>{await onSaveAttendance(attendanceSession,ids);setAttendanceSession(null)}} onClose={()=>setAttendanceSession(null)}/>}
   </div>
 }

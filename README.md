@@ -1,57 +1,22 @@
-# ACQ Scuola Calcio · Fase 6C
+# ACQ Scuola Calcio · Fase 6D Hotfix Segreteria
 
-## Correzione prioritaria
+## Bug corretti
 
-Il Segretario viene ora riconosciuto correttamente anche quando il ruolo nel database contiene:
-
-- `secretary`
-- `SEGRETARIO`
-- `segretario`
-- spazi accidentali
-- lettere maiuscole
-
-Il Segretario carica esclusivamente la propria dashboard dedicata.
-
-## Dashboard Segretario
-
-Mostra soltanto:
-
-- Tesserati
-- Calendari partite
-- Presenze
-- Scadenze
-- elenco delle sessioni con dati generali e presenze
-
-Non mostra:
-
-- creazione sessioni
-- riunioni tecniche
-- materiale didattico
-- notifiche tecniche
-- statistiche tecniche
-- filtri esercitazioni
-- archivio completo
-- libreria esercitazioni
-- valutazioni
-- backup
-- utenti
-
-## Collaboratore rimosso
-
-- eliminato dal menu Ruoli
-- eventuali vecchi Collaboratori vengono convertiti in Allenatori
-- i nuovi utenti hanno come ruolo predefinito Allenatore
-- ruoli consentiti:
-  - Direttore
-  - Coordinatore
-  - Allenatore
-  - Segretario
+- le presenze del Segretario vengono ora salvate immediatamente su Supabase
+- i documenti tesserato vengono confermati solo dopo il salvataggio reale del cloud
+- anagrafica tesserati salvata immediatamente anche dal Segretario
+- niente più falso messaggio di salvataggio
+- le finestre restano aperte se Supabase restituisce un errore
+- pulsanti con stato `SALVATAGGIO…`
+- Cronologia e notifiche vengono scritte solo dopo il salvataggio dell’archivio
+- uso dell’ultima versione dell’archivio per evitare sovrascritture Realtime
 
 ## Installazione
 
-1. Eseguire `supabase_phase6c.sql` in Supabase SQL Editor.
-2. Attendere `Success`.
-3. Caricare tutti i file su GitHub.
-4. Attendere il deploy verde.
-5. Fare logout e login con il Segretario.
-6. Aggiornare forzatamente il browser o riaprire la PWA.
+Non servono nuove query SQL se `supabase_phase6a.sql` e `supabase_phase6c.sql` sono già stati eseguiti.
+
+1. Caricare tutti i file su GitHub.
+2. Attendere il deploy verde.
+3. Fare logout e login.
+4. Registrare una presenza e ricaricare la pagina.
+5. Caricare un certificato medico e ricaricare la pagina.
