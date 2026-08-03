@@ -6,7 +6,7 @@ import { removeCloudFile, uploadCloudFile } from '../lib/storage'
 const displayDate = value => value ? value.split('-').reverse().join('/') : ''
 const safeFile = value => upper(value || 'PARTITA').replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '')
 
-export default function Matches({ category, matches, onChange, readOnly = false }) {
+export default function Matches({ category, matches, players = [], onChange, readOnly = false }) {
   const [callup, setCallup] = useState(null)
   const [busyId, setBusyId] = useState('')
   const sorted = useMemo(() => [...matches].sort((a,b) => {
@@ -56,7 +56,7 @@ export default function Matches({ category, matches, onChange, readOnly = false 
     if (match.logoPath) removeCloudFile(match.logoPath).catch(console.error)
     patch(match.id, {
       opponent:'', logo:'', logoPath:'', date:'', time:'', location:'', coach:'',
-      callupPlayers:'', meetingTime:'', meetingPlace:'', callupNotes:'', competition:'CAMPIONATO'
+      callupPlayers:'', callupPlayerIds:[], meetingTime:'', meetingPlace:'', callupNotes:'', competition:'CAMPIONATO'
     })
   }
 
@@ -99,6 +99,7 @@ export default function Matches({ category, matches, onChange, readOnly = false 
     {callup && <Callup
       category={category}
       match={callup}
+      allPlayers={players}
       readOnly={readOnly}
       onPatch={changes => {
         patch(callup.id, changes)
@@ -109,9 +110,93 @@ export default function Matches({ category, matches, onChange, readOnly = false 
   </section>
 }
 
-function Callup({ category, match, onPatch, onClose, readOnly }) {
-  const players = String(match.callupPlayers || '').split(/\n|,/).map(value => upper(value.trim())).filter(Boolean)
+function Callup({ category, match, allPlayers, onPatch, onClose, readOnly }) {
+  const [categoryFilter, setCategoryFilter] = useState(category || '')
+  const [query, setQuery] = useState('')
+
+  const activePlayers = useMemo(() => allPlayers
+    .filter(player => player.active !== false)
+    .sort((a,b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`,'it')),
+  [allPlayers])
+
+  const legacyNames = useMemo(() =>
+    String(match.callupPlayers || '')
+      .split(/\n|,/)
+      .map(value => upper(value.trim()))
+      .filter(Boolean),
+  [match.callupPlayers])
+
+  const selectedIds = useMemo(() => {
+    const saved = Array.isArray(match.callupPlayerIds)
+      ? match.callupPlayerIds.map(String)
+      : []
+
+    if (saved.length) return new Set(saved)
+
+    const legacySet = new Set(legacyNames)
+    return new Set(
+      activePlayers
+        .filter(player => legacySet.has(upper(`${player.lastName} ${player.firstName}`)))
+        .map(player => String(player.id))
+    )
+  }, [match.callupPlayerIds, legacyNames, activePlayers])
+
+  const selectedPlayers = useMemo(() =>
+    activePlayers.filter(player => selectedIds.has(String(player.id))),
+  [activePlayers, selectedIds])
+
+  const selectedNames = useMemo(() => {
+    if (selectedPlayers.length) {
+      return selectedPlayers.map(player => upper(`${player.lastName} ${player.firstName}`))
+    }
+    return legacyNames
+  }, [selectedPlayers, legacyNames])
+
+  const visiblePlayers = useMemo(() => {
+    const search = upper(query)
+    return activePlayers.filter(player =>
+      (!categoryFilter || player.category === categoryFilter)
+      && (!search || upper(`${player.firstName} ${player.lastName} ${player.category}`).includes(search))
+    )
+  }, [activePlayers, categoryFilter, query])
+
   const competition = upper(match.competition || 'CAMPIONATO')
+
+  function saveSelected(nextIds) {
+    const ids = [...nextIds].map(String)
+    const names = activePlayers
+      .filter(player => nextIds.has(String(player.id)))
+      .map(player => upper(`${player.lastName} ${player.firstName}`))
+
+    onPatch({
+      callupPlayerIds: ids,
+      callupPlayers: names.join('\n'),
+    })
+  }
+
+  function togglePlayer(playerId) {
+    if (readOnly) return
+    const next = new Set(selectedIds)
+    const id = String(playerId)
+    next.has(id) ? next.delete(id) : next.add(id)
+    saveSelected(next)
+  }
+
+  function selectVisible() {
+    if (readOnly) return
+    const next = new Set(selectedIds)
+    visiblePlayers.forEach(player => next.add(String(player.id)))
+    saveSelected(next)
+  }
+
+  function clearVisible() {
+    if (readOnly) return
+    const next = new Set(selectedIds)
+    visiblePlayers.forEach(player => next.delete(String(player.id)))
+    saveSelected(next)
+  }
+
+  const players = selectedNames
 
   async function loadImage(src) {
     if (!src) return null
@@ -147,7 +232,7 @@ function Callup({ category, match, onPatch, onClose, readOnly }) {
     canvas.width=1080
     canvas.height=1350
     const ctx=canvas.getContext('2d')
-    const heroLogo=document.querySelector('.hero>img')
+    const heroLogo=document.querySelector('.hero-title-row>img, .hero img')
     const homeSrc=heroLogo ? heroLogo.src : '/ACQ-Scuola-Calcio/logo-acquacetosa.png'
     const [homeLogo,awayLogo]=await Promise.all([loadImage(homeSrc),loadImage(match.logo)])
 
@@ -278,9 +363,82 @@ function Callup({ category, match, onPatch, onClose, readOnly }) {
       <label>ORARIO<input value={match.time} readOnly/></label>
       <label>ALLENATORE<input disabled={readOnly} value={match.coach||''} onChange={event=>onPatch({coach:upper(event.target.value)})}/></label>
       <label>LUOGO<input disabled={readOnly} value={match.location||''} onChange={event=>onPatch({location:upper(event.target.value)})}/></label>
-      <label>ORARIO RITROVO<input disabled={readOnly} type="time" value={match.meetingTime||''} onChange={event=>onPatch({meetingTime:event.target.value})}/></label>
-      <label>LUOGO RITROVO<input disabled={readOnly} value={match.meetingPlace||''} onChange={event=>onPatch({meetingPlace:upper(event.target.value)})}/></label>
-      <label className="full">CONVOCATI, UNO PER RIGA<textarea disabled={readOnly} rows="10" value={match.callupPlayers||''} onChange={event=>onPatch({callupPlayers:upper(event.target.value)})}/></label>
+      <label className="full callup-meeting-time">ORARIO RITROVO<input disabled={readOnly} type="time" value={match.meetingTime||''} onChange={event=>onPatch({meetingTime:event.target.value})}/></label>
+
+      <section className="full callup-roster-picker">
+        <header>
+          <div>
+            <small>SELEZIONE RAPIDA</small>
+            <h3>CONVOCATI</h3>
+            <p>PUOI SELEZIONARE TESSERATI DI QUALSIASI CATEGORIA.</p>
+          </div>
+          <div className="callup-roster-count">
+            <b>{selectedPlayers.length || legacyNames.length}</b>
+            <span>CONVOCATI</span>
+          </div>
+        </header>
+
+        <div className="callup-roster-tools">
+          <select
+            value={categoryFilter}
+            onChange={event=>setCategoryFilter(event.target.value)}
+          >
+            <option value="">TUTTE LE CATEGORIE</option>
+            {['PICCOLI AMICI','PRIMI CALCI','PULCINI','ESORDIENTI'].map(value=>
+              <option key={value}>{value}</option>
+            )}
+          </select>
+
+          <input
+            placeholder="CERCA TESSERATO…"
+            value={query}
+            onChange={event=>setQuery(event.target.value)}
+          />
+
+          {!readOnly && <button type="button" className="soft" onClick={selectVisible}>SELEZIONA VISIBILI</button>}
+          {!readOnly && <button type="button" className="soft" onClick={clearVisible}>AZZERA VISIBILI</button>}
+        </div>
+
+        <div className="callup-selected-summary">
+          <b>{selectedNames.length} GIOCATORI SELEZIONATI</b>
+          <span>{selectedNames.length ? selectedNames.join(' · ') : 'NESSUN CONVOCATO SELEZIONATO'}</span>
+        </div>
+
+        <div className="callup-roster-list">
+          {!activePlayers.length &&
+            <div className="app-empty">
+              <b>NESSUN TESSERATO DISPONIBILE</b>
+              <span>IL DIRETTORE DEVE PRIMA INSERIRE I GIOCATORI NELL’ANAGRAFICA TESSERATI.</span>
+            </div>
+          }
+
+          {activePlayers.length > 0 && !visiblePlayers.length &&
+            <div className="app-empty">
+              <b>NESSUN GIOCATORE TROVATO</b>
+              <span>MODIFICA LA CATEGORIA O LA RICERCA.</span>
+            </div>
+          }
+
+          {visiblePlayers.map(player => {
+            const checked = selectedIds.has(String(player.id))
+            return <label key={player.id} className={checked ? 'selected' : ''}>
+              <input
+                type="checkbox"
+                disabled={readOnly}
+                checked={checked}
+                onChange={()=>togglePlayer(player.id)}
+              />
+              <span className="callup-checkbox">✓</span>
+              <span className="callup-shirt-number">{player.shirtNumber === '' ? '—' : player.shirtNumber}</span>
+              <span className="callup-player-data">
+                <b>{player.lastName} {player.firstName}</b>
+                <small>{player.category}</small>
+              </span>
+            </label>
+          })}
+        </div>
+      </section>
+
       <label className="full">NOTE<textarea disabled={readOnly} rows="3" value={match.callupNotes||''} onChange={event=>onPatch({callupNotes:upper(event.target.value)})}/></label>
       <footer className="modal-actions full">
         <button className="ghost" onClick={onClose}>CHIUDI</button>

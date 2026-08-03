@@ -19,7 +19,7 @@ export default function SecretaryCalendars({ matchesByCategory, onClose }) {
         {rows.map(match=><article key={`${match.category}-${match.id}`}>
           <div className="secretary-match-date"><b>{match.date?match.date.split('-').reverse().join('/'):'—'}</b><span>{match.time||'ORARIO N/D'}</span></div>
           <div><small>{match.category}</small><h3>ACQUACETOSA VS {match.opponent||'AVVERSARIO DA DEFINIRE'}</h3><p>{match.location||'LUOGO DA DEFINIRE'}</p></div>
-          <div className="secretary-callup-info"><b>{String(match.callupPlayers||'').split(/\n|,/).filter(Boolean).length}</b><span>CONVOCATI</span></div>
+          <div className="secretary-callup-info"><b>{Array.isArray(match.callupPlayerIds)&&match.callupPlayerIds.length ? match.callupPlayerIds.length : String(match.callupPlayers||'').split(/\n|,/).filter(Boolean).length}</b><span>CONVOCATI</span></div>
         </article>)}
       </section>
     </div>

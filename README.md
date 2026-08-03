@@ -1,41 +1,28 @@
-# ACQ Scuola Calcio · Fase 6F
+# ACQ Scuola Calcio · Fase 6G
 
-## Notifiche tecniche corrette
+## Convocazioni aggiornate
 
-Direttore, Coordinatori e Allenatori ricevono notifiche soltanto per:
-
-- nuova sessione di allenamento caricata da un membro dello staff tecnico
-- nuova riunione tecnica caricata da un Direttore
-- nuovo materiale didattico caricato da un Direttore
-
-Non ricevono notifiche per:
-
-- presenze
-- certificati medici
-- tesseramenti
-- documenti dei giocatori
-- esercitazioni
-- backup
-- utenti
-- operazioni della Segreteria
-
-Le scadenze documentali restano esclusivamente nell'Area Segreteria.
-
-## Nuovo header
-
-- logo spostato a sinistra
-- titolo `ASD ACQUACETOSA CENTRO CALCIO`
-- font del titolo leggermente ridotto
-- sottotitolo `Scuola calcio` più piccolo e non in grassetto
-- `2026/27` accanto ad `Archivio metodologico Acquacetosa`
-- rimossa la pillola stagione
-- pulsante `ESCI` spostato in alto a destra
+- rimosso il campo `Luogo di ritrovo`
+- mantenuto `Orario di ritrovo`
+- eliminato il campo testuale `Convocati, uno per riga`
+- aggiunto menu categoria
+- opzione `Tutte le categorie`
+- elenco tesserati attivi con checkbox
+- ricerca rapida per nome, cognome e categoria
+- `Seleziona visibili`
+- `Azzera visibili`
+- possibilità di convocare giocatori appartenenti a categorie diverse
+- riepilogo dei giocatori selezionati
+- conteggio convocati aggiornato nel calendario Segreteria
+- PNG della convocazione invariato nel layout e alimentato dalla nuova selezione
+- compatibilità con le vecchie convocazioni inserite manualmente
 
 ## Installazione
 
-1. Eseguire `supabase_phase6f.sql` nel SQL Editor di Supabase.
-2. Attendere `Success`.
-3. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
-4. Attendere il deploy verde.
-5. Fare logout e login.
-6. Aggiornare forzatamente il browser o riaprire la PWA.
+Non servono nuove query SQL.
+
+1. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
+2. Conservare `.github`.
+3. Attendere il deploy verde.
+4. Aggiornare forzatamente il browser o riaprire la PWA.
+5. Aprire `Partite` → `Convocazione`.

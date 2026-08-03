@@ -1,7 +1,7 @@
 {
   "name": "acq-scuola-calcio-v24-cloud",
   "private": true,
-  "version": "6.3.0-phase6f-notifications-header",
+  "version": "6.4.0-phase6g-callups-roster",
   "type": "module",
   "scripts": {
     "dev": "vite",

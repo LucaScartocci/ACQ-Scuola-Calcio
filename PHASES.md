@@ -1,3 +1,3 @@
-# Fase 6F
+# Fase 6G
 
-Separazione definitiva delle notifiche tecniche da quelle della Segreteria e nuovo header istituzionale.
+Convocazioni collegate all'anagrafica tesserati, con filtri categoria e selezione tramite checkbox.

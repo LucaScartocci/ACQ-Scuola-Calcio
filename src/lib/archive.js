@@ -4,7 +4,7 @@ export const COACHES = [
 ]
 export const CATEGORIES = ['PICCOLI AMICI','PRIMI CALCI','PULCINI','ESORDIENTI']
 export const PHASES = ['ATTIVAZIONE','PARTE CENTRALE','PARTITA A TEMA']
-export const ARCHIVE_VERSION = 5
+export const ARCHIVE_VERSION = 6
 export const ADMIN_PASSWORD = 'vittoriout'
 
 const safeId = prefix => {
@@ -16,7 +16,7 @@ const safeId = prefix => {
 
 const emptyMatch = (slot) => ({
   id: safeId(`m-${slot}`), slot, opponent: '', logo: '', date: '', time: '',
-  location: '', coach: '', callupPlayers: '', logoPath: '', competition: 'CAMPIONATO', meetingTime: '', meetingPlace: '', callupNotes: ''
+  location: '', coach: '', callupPlayers: '', callupPlayerIds: [], logoPath: '', competition: 'CAMPIONATO', meetingTime: '', meetingPlace: '', callupNotes: ''
 })
 
 
@@ -104,8 +104,40 @@ export const normalizeArchive = (value) => {
       description: upper(e.description || ''),
       createdAt: Number(e.createdAt || e.created) || Date.now(),
     })),
-    matchesByCategory: value.matchesByCategory && typeof value.matchesByCategory === 'object'
-      ? value.matchesByCategory : base.matchesByCategory,
+    matchesByCategory: Object.fromEntries(
+      CATEGORIES.map(category => {
+        const existing = Array.isArray(value.matchesByCategory?.[category])
+          ? value.matchesByCategory[category]
+          : []
+        const bySlot = new Map(existing.map((match,index) => [Number(match.slot)||index+1, match]))
+
+        return [
+          category,
+          Array.from({length:30},(_,index) => {
+            const slot = index+1
+            const fallback = emptyMatch(slot)
+            const match = bySlot.get(slot) || fallback
+            return {
+              ...fallback,
+              ...match,
+              id:match.id || fallback.id,
+              slot,
+              opponent:upper(match.opponent || ''),
+              location:upper(match.location || ''),
+              coach:upper(match.coach || ''),
+              competition:upper(match.competition || 'CAMPIONATO'),
+              callupPlayers:upper(match.callupPlayers || ''),
+              callupPlayerIds:Array.isArray(match.callupPlayerIds)
+                ? [...new Set(match.callupPlayerIds.map(String))]
+                : [],
+              meetingTime:match.meetingTime || '',
+              meetingPlace:'',
+              callupNotes:upper(match.callupNotes || ''),
+            }
+          })
+        ]
+      })
+    ),
     documents: {
       meetings: Array.isArray(rawDocuments.meetings) ? rawDocuments.meetings.map(normalizeDocument) : [],
       teaching: Array.isArray(rawDocuments.teaching) ? rawDocuments.teaching.map(normalizeDocument) : [],
