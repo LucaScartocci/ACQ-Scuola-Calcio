@@ -415,6 +415,11 @@ export async function generateSessionPdf({ session, exercises, logoUrl, appUrl }
     cleanFile(formatDate(session.date)),
   ].filter(Boolean).join('_') + '.pdf'
 
-  doc.save(filename)
-  return { filename, pages:totalPages, exercises:orderedExercises.length }
+  const blob = doc.output('blob')
+  return {
+    filename,
+    pages:totalPages,
+    exercises:orderedExercises.length,
+    blob,
+  }
 }

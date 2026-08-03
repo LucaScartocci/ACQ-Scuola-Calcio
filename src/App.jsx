@@ -15,6 +15,7 @@ import AuditCenter from './components/AuditCenter'
 import StatisticsDashboard from './components/StatisticsDashboard'
 import NotificationCenter from './components/NotificationCenter'
 import BackupCenter from './components/BackupCenter'
+import SessionPdfPreview from './components/SessionPdfPreview'
 import { removeCloudFile, uploadCloudFile } from './lib/storage'
 import { generateSessionPdf } from './lib/sessionPdf'
 import './styles.css'
@@ -51,6 +52,7 @@ export default function App() {
   const [notificationsLoading, setNotificationsLoading] = useState(false)
   const [backupsOpen, setBackupsOpen] = useState(false)
   const [pdfBusySessionId, setPdfBusySessionId] = useState('')
+  const [pdfPreview, setPdfPreview] = useState(null)
   const saveTimer = useRef(null)
   const applyingRemote = useRef(false)
   const undoStack = useRef([])
@@ -528,9 +530,12 @@ export default function App() {
     showToast('ARCHIVIO RIPRISTINATO')
   }
 
-  async function exportSessionPdf(session) {
-    const sessionExercises = archive.exercises.filter(exercise => String(exercise.sessionId) === String(session.id))
+  async function openSessionPdf(session) {
+    const sessionExercises = archive.exercises.filter(
+      exercise => String(exercise.sessionId) === String(session.id)
+    )
     setPdfBusySessionId(session.id)
+
     try {
       const result = await generateSessionPdf({
         session,
@@ -538,13 +543,22 @@ export default function App() {
         logoUrl:`${window.location.origin}${import.meta.env.BASE_URL}logo-acquacetosa.png`,
         appUrl:`${window.location.origin}${window.location.pathname}`,
       })
-      await writeAuditLog('ESPORTA PDF SEDUTA', result.filename, {
+
+      const url = URL.createObjectURL(result.blob)
+      setPdfPreview({
+        ...result,
+        url,
+        sessionId:session.id,
+      })
+
+      await writeAuditLog('APRI PDF SEDUTA', result.filename, {
         objectType:'SESSIONE',
         objectId:session.id,
         category:session.category,
         metadata:{pages:result.pages,exercises:result.exercises}
       })
-      showToast('PDF SEDUTA GENERATO')
+
+      showToast('ANTEPRIMA PDF PRONTA')
     } catch (error) {
       console.error('PDF SESSION ERROR', error)
       window.alert('GENERAZIONE PDF NON RIUSCITA: ' + (error.message || 'ERRORE SCONOSCIUTO'))
@@ -738,11 +752,32 @@ export default function App() {
   if(profile.active === false) return <div className="fatal-error"><h1>ACCOUNT SOSPESO</h1><p>CONTATTA IL DIRETTORE TECNICO.</p><button onClick={()=>supabase.auth.signOut()}>ESCI</button></div>
 
   return <div className="app-shell">
-    <header className="hero"><div><small>ARCHIVIO METODOLOGICO ACQUACETOSA</small><h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1></div><img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`}/><b>2026/27</b><nav>{canWrite && <button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button>}<button onClick={()=>setDocumentModal('meetings')}>RIUNIONI TECNICHE</button><button onClick={()=>setDocumentModal('teaching')}>MATERIALE DIDATTICO</button><button className="glass" onClick={exportArchive}>ESPORTA</button><button className="glass" onClick={()=>fileInput.current?.click()}>IMPORTA</button>{legacyArchive && <button className="glass" onClick={migrateLegacy}>MIGRA V23</button>}<button className="glass" onClick={()=>setBackupsOpen(true)}>BACKUP</button><button className="glass notification-trigger" onClick={()=>setNotificationsOpen(true)}>
-      NOTIFICHE
-      {unreadNotifications > 0 && <span>{unreadNotifications > 99 ? '99+' : unreadNotifications}</span>}
-    </button>
-    <button className="glass" onClick={()=>setStatisticsOpen(true)}>STATISTICHE</button><button className="glass" onClick={installApp}>INSTALLA APP</button>{canManageUsers && <button className="glass" onClick={()=>setUsersOpen(true)}>UTENTI</button>}<button className="glass" onClick={()=>supabase.auth.signOut()}>ESCI</button><input ref={fileInput} hidden type="file" accept="application/json,.json" onChange={e=>importArchive(e.target.files?.[0])}/></nav></header>
+    <header className="hero">
+      <div>
+        <small>ARCHIVIO METODOLOGICO ACQUACETOSA</small>
+        <h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1>
+      </div>
+      <img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`} alt="Acquacetosa"/>
+      <b>2026/27</b>
+      <nav>
+        {canWrite && <button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button>}
+        <button onClick={()=>setDocumentModal('meetings')}>RIUNIONI TECNICHE</button>
+        <button onClick={()=>setDocumentModal('teaching')}>MATERIALE DIDATTICO</button>
+
+        <button className="glass notification-trigger" onClick={()=>setNotificationsOpen(true)}>
+          NOTIFICHE
+          {unreadNotifications > 0 && <span>{unreadNotifications > 99 ? '99+' : unreadNotifications}</span>}
+        </button>
+
+        <button className="glass" onClick={()=>setStatisticsOpen(true)}>STATISTICHE</button>
+        <button className="glass" onClick={installApp}>INSTALLA APP</button>
+
+        {isDirector && <button className="glass admin-button" onClick={()=>setBackupsOpen(true)}>BACKUP</button>}
+        {isDirector && <button className="glass admin-button" onClick={()=>setUsersOpen(true)}>UTENTI</button>}
+
+        <button className="glass" onClick={()=>supabase.auth.signOut()}>ESCI</button>
+      </nav>
+    </header>
     <section className="profile-bar">
       <div className="profile-avatar">{(profile.first_name?.[0] || auth.user.email?.[0] || 'U')}{profile.last_name?.[0] || ''}</div>
       <div><b>{upper([profile.first_name,profile.last_name].filter(Boolean).join(' ') || auth.user.email)}</b><span>{upper(profile.role)}{profile.coach_name ? ` · ${profile.coach_name}` : ''}</span></div>
@@ -753,8 +788,8 @@ export default function App() {
     <section className="category-strip"><button className={!selectedCategory?'active':''} onClick={()=>setSelectedCategory('')}><span>▦</span><b>ARCHIVIO COMPLETO</b><small>{archive.sessions.length}SS / {archive.exercises.length}ES</small></button>{visibleCategories.map(c=>{const ss=archive.sessions.filter(s=>s.category===c).length,es=archive.exercises.filter(e=>e.category===c).length;return <button key={c} className={selectedCategory===c?'active':''} onClick={()=>setSelectedCategory(c)}><span>⚽</span><b>{c}</b><small>{ss}SS / {es}ES</small></button>})}</section>
     <nav className="view-tabs"><button className={view==='sessions'?'active':''} onClick={()=>setView('sessions')}>SESSIONI ALLENAMENTO</button><button className={view==='library'?'active':''} onClick={()=>setView('library')}>LIBRERIA ESERCITAZIONI</button>{selectedCategory&&<button className={view==='matches'?'active':''} onClick={()=>setView('matches')}>PARTITE</button>}</nav>
     {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}'</p></div><div>
-  <button className="pdf-session-button" onClick={()=>exportSessionPdf(s)} disabled={pdfBusySessionId===s.id}>
-    {pdfBusySessionId===s.id ? 'CREAZIONE PDF…' : 'ESPORTA PDF'}
+  <button className="pdf-session-button" onClick={()=>openSessionPdf(s)} disabled={pdfBusySessionId===s.id}>
+    {pdfBusySessionId===s.id ? 'APERTURA…' : 'APRI'}
   </button>
   {canWrite && <button onClick={()=>openNewExercise(s)}>＋ ESERCITAZIONE</button>}
   {canWrite && <button className="soft" onClick={()=>setSessionModal(s)}>MODIFICA</button>}
@@ -762,11 +797,12 @@ export default function App() {
 </div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
     {view==='library' && <main><div className="section-title"><div><h2>LIBRERIA ESERCITAZIONI</h2><p>TUTTE LE ESERCITAZIONI DELL’ARCHIVIO.</p></div><b>{filteredExercises.length} ESERCITAZIONI</b></div>{!filteredExercises.length && <EmptyState title="NESSUNA ESERCITAZIONE TROVATA" text="MODIFICA I FILTRI O AGGIUNGI UNA ESERCITAZIONE."/>}<div className="exercise-grid library">{filteredExercises.map(e=>{const s=archive.sessions.find(x=>x.id===e.sessionId);return <ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>s&&setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>})}</div></main>}
     {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} readOnly={!canWrite} onChange={items=>{if(!canWrite)return;commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory, { objectType:'CALENDARIO PARTITE', category:selectedCategory })}}/></main>}
-    <div className="build-badge">FASE 4A · PDF</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
+    <div className="build-badge">FASE 4B · PREVIEW PDF</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
     {toast && <div className="action-toast">{toast}</div>}
     {auditOpen && <AuditModal items={archive.audit||[]} onClose={()=>setAuditOpen(false)}/>}
     {sessionModal && <SessionModal initial={sessionModal.id?sessionModal:null} allowedCategories={visibleCategories} fixedCoach={isCoach?profileCoach:''} canChooseCoach={!isCoach} onSave={saveSession} onClose={()=>setSessionModal(null)}/>} 
     {exerciseModal && <ExerciseModal session={exerciseModal.session} initial={exerciseModal.initial} onSave={saveExercise} onClose={()=>setExerciseModal(null)}/>} 
+    {pdfPreview && <SessionPdfPreview pdf={pdfPreview} onClose={()=>setPdfPreview(null)}/>}
     {backupsOpen && <BackupCenter archive={archive} profile={profile} canRestore={canDelete} onRestore={restoreArchiveFromBackup} onClose={()=>setBackupsOpen(false)}/>}
     {notificationsOpen && <NotificationCenter
       profile={profile}

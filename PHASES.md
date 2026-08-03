@@ -1,8 +1,6 @@
 # Stato progetto
 
-- Fase 1: React, Auth, Cloud e Realtime
-- Fase 2: archivio completo, Storage, partite, convocazioni e PWA
-- Fase 3: utenti, audit, statistiche, notifiche e backup
 - Fase 4A: PDF professionale della seduta con QR Code
+- Fase 4B: pulizia menu, permessi amministrativi e anteprima PDF
 
-Il perimetro richiesto è ora completo. I prossimi interventi possono concentrarsi soltanto su rifiniture grafiche e bug.
+Il gestionale entra ora nella fase di rifinitura e collaudo finale.

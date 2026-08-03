@@ -259,3 +259,37 @@
   .session-card>header>div:last-child{display:grid!important;grid-template-columns:1fr 1fr!important;width:100%}
   .session-card>header>div:last-child .pdf-session-button{grid-column:1/-1}
 }
+
+/* FASE 4B: MENU PULITO E ANTEPRIMA PDF */
+.hero nav{align-items:center}
+.hero nav .admin-button{border-color:rgba(245,184,47,.58);background:rgba(245,184,47,.10)}
+.pdf-session-button{min-width:100px!important}
+.pdf-preview{padding:18px 20px 22px;background:#eef3f9}
+.pdf-preview>header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 15px;border-radius:15px;background:#fff;border:1px solid #d7e2ef}
+.pdf-preview>header>div:first-child{display:grid;gap:3px;min-width:0}
+.pdf-preview>header b{color:#153552;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pdf-preview>header span{color:#77879b;font-size:9px;font-weight:800}
+.pdf-preview>header>div:last-child{display:flex;gap:8px}
+.pdf-preview button{min-height:42px;border:0;border-radius:11px;padding:10px 13px;background:#071b34;color:#fff;font-size:9px;font-weight:900;cursor:pointer}
+.pdf-preview button.soft{background:#edf4fc;color:#173652;border:1px solid #cddbeb}
+.pdf-preview button.ghost{background:#fff;color:#173652;border:1px solid #cddbeb}
+.pdf-frame-wrap{position:relative;height:min(70vh,780px);margin-top:12px;border:1px solid #cad8e8;border-radius:16px;overflow:hidden;background:#596575}
+.pdf-frame{width:100%;height:100%;border:0;background:#596575}
+.pdf-mobile-fallback{display:none;place-items:center;align-content:center;gap:10px;height:100%;padding:30px;text-align:center;background:#f8fbff}
+.pdf-mobile-fallback b{color:#153552;font-size:18px}
+.pdf-mobile-fallback span{max-width:420px;color:#6c7d91;font-size:11px;font-weight:750;line-height:1.5}
+.pdf-preview>footer{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+
+@media(max-width:850px){
+  .pdf-preview>header{align-items:flex-start;flex-direction:column}
+  .pdf-preview>header>div:last-child{width:100%}
+  .pdf-preview>header button{flex:1}
+}
+@media(max-width:650px){
+  .pdf-preview{padding:12px}
+  .pdf-frame-wrap{height:58vh}
+  .pdf-frame{display:none}
+  .pdf-mobile-fallback{display:grid}
+  .pdf-preview>header>div:last-child{display:grid;grid-template-columns:1fr}
+  .pdf-preview>footer{display:grid;grid-template-columns:1fr 1fr}
+}
