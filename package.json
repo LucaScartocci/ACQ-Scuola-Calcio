@@ -1,7 +1,7 @@
 {
   "name": "acq-scuola-calcio-v24-cloud",
   "private": true,
-  "version": "5.3.0-phase5d-attendance-pdf2",
+  "version": "6.0.0-phase6a-secretary",
   "type": "module",
   "scripts": {
     "dev": "vite",

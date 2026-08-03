@@ -8,6 +8,7 @@ const ROLES = [
   ['coordinator','COORDINATORE'],
   ['coach','ALLENATORE'],
   ['collaborator','COLLABORATORE'],
+  ['secretary','SEGRETARIO'],
 ]
 
 export default function UserManagement({ currentProfile, onClose, onChanged }) {

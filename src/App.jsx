@@ -19,6 +19,7 @@ import SessionPdfPreview from './components/SessionPdfPreview'
 import PlayerManager from './components/PlayerManager'
 import AttendanceModal from './components/AttendanceModal'
 import AttendanceStatistics from './components/AttendanceStatistics'
+import SecretaryDashboard from './components/SecretaryDashboard'
 import { removeCloudFile, uploadCloudFile } from './lib/storage'
 import { generateSessionPdf } from './lib/sessionPdf'
 import './styles.css'
@@ -113,17 +114,18 @@ export default function App() {
   const isCoordinator = role === 'coordinator'
   const isCoach = role === 'coach'
   const isCollaborator = role === 'collaborator'
-  const canWrite = Boolean(profile?.active) && !isCollaborator
+  const isSecretary = role === 'secretary'
+  const canWrite = Boolean(profile?.active) && !isCollaborator && !isSecretary
   const canDelete = Boolean(profile?.active) && isDirector
   const canManageUsers = Boolean(profile?.active) && isDirector
   const canRate = Boolean(profile?.active) && canWrite
   const assignedCategories = useMemo(() => {
     if (!profile) return []
-    if (isDirector || isCoordinator) return CATEGORIES
+    if (isDirector || isCoordinator || isSecretary) return CATEGORIES
     return Array.isArray(profile.categories) ? profile.categories : []
-  }, [profile, isDirector, isCoordinator])
+  }, [profile, isDirector, isCoordinator, isSecretary])
   const profileCoach = upper(profile?.coach_name || profile?.last_name || '')
-  const visibleCategories = assignedCategories.length ? assignedCategories : (isDirector || isCoordinator ? CATEGORIES : [])
+  const visibleCategories = assignedCategories.length ? assignedCategories : (isDirector || isCoordinator || isSecretary ? CATEGORIES : [])
 
   async function loadProfile() {
     if (!auth?.user) return
@@ -598,9 +600,24 @@ export default function App() {
     setExerciseModal({ session: { ...session } })
   }
 
+  function savePlayerDocuments(playerId, documents, action, details) {
+    if (!isDirector && !isSecretary) {
+      window.alert('PERMESSO NEGATO.')
+      return
+    }
+    const player=archive.players.find(item=>item.id===playerId)
+    commit(
+      current=>({...current,playerDocuments:{...(current.playerDocuments||{}),[playerId]:documents}}),
+      action,
+      details,
+      {objectType:'DOCUMENTO TESSERATO',objectId:playerId,category:player?.category||''}
+    )
+    showToast('DOCUMENTI TESSERATO AGGIORNATI')
+  }
+
   function savePlayer(item) {
-    if (!isDirector) {
-      window.alert('SOLO IL DIRETTORE PUÒ GESTIRE I TESSERATI.')
+    if (!isDirector && !isSecretary) {
+      window.alert('SOLO DIRETTORE E SEGRETARIO POSSONO GESTIRE I TESSERATI.')
       return
     }
     const exists = archive.players.some(player => player.id === item.id)
@@ -619,7 +636,7 @@ export default function App() {
   }
 
   function saveAttendance(session, presentIds) {
-    if (!canWrite) {
+    if (!canWrite && !isSecretary) {
       window.alert('IL TUO RUOLO NON CONSENTE DI REGISTRARE LE PRESENZE.')
       return
     }
@@ -893,6 +910,16 @@ export default function App() {
   if(!auth) return <Login />
   if(profileLoading || !profile) return <div className="loading">CARICAMENTO PROFILO UTENTE…</div>
   if(profile.active === false) return <div className="fatal-error"><h1>ACCOUNT SOSPESO</h1><p>CONTATTA IL DIRETTORE TECNICO.</p><button onClick={()=>supabase.auth.signOut()}>ESCI</button></div>
+
+  if (isSecretary) return <SecretaryDashboard
+    archive={archive}
+    profile={profile}
+    status={status}
+    isOnline={isOnline}
+    onSignOut={()=>supabase.auth.signOut()}
+    onSavePlayerDocuments={savePlayerDocuments}
+    onSaveAttendance={saveAttendance}
+  />
 
   return <div className="app-shell">
     <header className="hero">
