@@ -127,16 +127,6 @@ export default function App() {
   }, [auth?.user?.id])
 
   useEffect(() => {
-    if (!auth?.user || !profile || loginAuditWritten.current === auth.user.id) return
-    loginAuditWritten.current = auth.user.id
-    writeAuditLog('ACCESSO', 'ACCESSO AL GESTIONALE', {
-      objectType:'SESSIONE UTENTE',
-      objectId:auth.user.id,
-      metadata:{ role:profile.role }
-    })
-  }, [auth?.user?.id, profile, writeAuditLog])
-
-  useEffect(() => {
     if (!auth) return
     let channel
     async function start() {
@@ -231,6 +221,16 @@ export default function App() {
     const { error } = await supabase.from('audit_logs').insert(payload)
     if (error) console.error('AUDIT LOG ERROR', error)
   }, [auth, profile])
+
+  useEffect(() => {
+    if (!auth?.user || !profile || loginAuditWritten.current === auth.user.id) return
+    loginAuditWritten.current = auth.user.id
+    writeAuditLog('ACCESSO', 'ACCESSO AL GESTIONALE', {
+      objectType:'SESSIONE UTENTE',
+      objectId:auth.user.id,
+      metadata:{ role:profile.role }
+    })
+  }, [auth?.user?.id, profile, writeAuditLog])
 
   const commit = useCallback((updater, action = 'MODIFICA ARCHIVIO', details = '', context = {}) => {
     setArchive(previous => {
