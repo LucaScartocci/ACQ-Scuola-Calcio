@@ -1,32 +1,40 @@
-# ACQ Scuola Calcio v24 Cloud · Fase 5C
+# ACQ Scuola Calcio v24 Cloud · Fase 5D
 
-## Priorità corretta: creazione sessioni
+## Modifiche presenze
 
-- salvataggio della sessione immediato e atomico
-- invio immediato a Supabase, senza attendere il timer generale
-- Cronologia e Notifiche generate soltanto dopo il salvataggio effettivo
-- blocco dei doppi clic sul pulsante Salva sessione
-- pulsante `SALVATAGGIO…` durante l'operazione
-- protezione dagli aggiornamenti Realtime più vecchi
-- eliminato il doppio salvataggio automatico dopo un salvataggio immediato
-- utilizzo dell'ultima versione reale dell'archivio tramite riferimento aggiornato
-- dopo la creazione viene aperta automaticamente la categoria corretta
-- filtri testuali azzerati per rendere immediatamente visibile la nuova sessione
-- messaggio finale con la categoria effettivamente salvata
+- in ogni sessione è possibile selezionare giocatori di qualsiasi categoria
+- menu categoria preimpostato sulla categoria della seduta
+- opzione Tutte le categorie
+- ricerca per nome, cognome e categoria
+- Seleziona visibili e Azzera visibili
+- i giocatori già selezionati restano presenti anche cambiando filtro
+- riepilogo completo dei giocatori selezionati
+- categoria visibile accanto a ogni giocatore
 
-## Modifica grafica
+## Modifiche PDF
 
-- font dei filtri leggermente ridotto
-- larghezze minime aumentate su desktop
-- scritta `FASE ALLENAMENTO` leggibile per intero
-- padding delle tendine ottimizzato
+- PDF ridotto a massimo 2 pagine
+- pagina 1:
+  - dati della seduta
+  - obiettivo
+  - numero presenti
+  - elenco presenze diviso per categoria
+  - riepilogo minuti ed esercitazioni
+- pagina 2:
+  - esercitazioni in formato compatto
+  - immagine, titolo, fase, durata, giocatori, spazio e obiettivo
+  - QR Code per ogni esercitazione
+- massimo 6 esercitazioni mostrate nella seconda pagina
+- eventuali esercitazioni aggiuntive vengono segnalate senza creare altre pagine
 
 ## Installazione
 
-Non servono query SQL.
+Non servono nuove query SQL.
 
 1. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
 2. Conservare `.github`.
 3. Attendere il deploy verde.
-4. Aggiornare con Command + Shift + R.
-5. Testare una nuova sessione scegliendo `PRIMI CALCI`.
+4. Aggiornare forzatamente il browser o riaprire la PWA.
+5. Aprire una sessione → `+ PRESENZE`.
+6. Selezionare giocatori anche da categorie diverse.
+7. Premere `APRI` per controllare il PDF di 2 pagine.

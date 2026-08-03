@@ -1,5 +1,4 @@
 # Stato progetto
 
-- Fase 5A: tesserati e presenze
-- Fase 5B: dati demo e header
-- Fase 5C: hotfix prioritario creazione sessioni e filtri leggibili
+- Fase 5C: hotfix salvataggio sessioni
+- Fase 5D: presenze trasversali e PDF massimo 2 pagine

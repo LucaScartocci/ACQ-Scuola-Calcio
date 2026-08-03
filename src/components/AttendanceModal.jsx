@@ -1,23 +1,27 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import Modal from './Modal'
+import { CATEGORIES } from '../lib/archive'
 
 export default function AttendanceModal({ session, players, attendance, onSave, onClose }) {
-  const categoryPlayers = useMemo(() => players
-    .filter(player => player.category === session.category && player.active !== false)
-    .sort((a,b)=>`${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`,'it')),
-  [players, session.category])
-
+  const [categoryFilter, setCategoryFilter] = useState(session.category || '')
   const [presentIds, setPresentIds] = useState(new Set(attendance?.presentIds || []))
   const [query, setQuery] = useState('')
 
-  useEffect(() => {
-    setPresentIds(new Set(attendance?.presentIds || []))
-  }, [attendance])
+  const activePlayers = useMemo(() =>
+    players
+      .filter(player => player.active !== false)
+      .sort((a,b) =>
+        `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, 'it')
+      ),
+  [players])
 
   const visible = useMemo(() => {
     const q = query.trim().toUpperCase()
-    return categoryPlayers.filter(player => !q || `${player.firstName} ${player.lastName}`.includes(q))
-  }, [categoryPlayers, query])
+    return activePlayers.filter(player =>
+      (!categoryFilter || player.category === categoryFilter)
+      && (!q || `${player.firstName} ${player.lastName} ${player.category}`.includes(q))
+    )
+  }, [activePlayers, categoryFilter, query])
 
   function toggle(id) {
     setPresentIds(current => {
@@ -27,16 +31,24 @@ export default function AttendanceModal({ session, players, attendance, onSave, 
     })
   }
 
-  function selectAll() {
-    setPresentIds(new Set(categoryPlayers.map(player=>player.id)))
+  function selectVisible() {
+    setPresentIds(current => {
+      const next = new Set(current)
+      visible.forEach(player => next.add(player.id))
+      return next
+    })
   }
 
-  function clearAll() {
-    setPresentIds(new Set())
+  function clearVisible() {
+    setPresentIds(current => {
+      const next = new Set(current)
+      visible.forEach(player => next.delete(player.id))
+      return next
+    })
   }
 
-  const present = presentIds.size
-  const total = categoryPlayers.length
+  const selectedPlayers = activePlayers.filter(player => presentIds.has(player.id))
+  const total = activePlayers.length
 
   return <Modal title={`PRESENZE · ${session.category}`} onClose={onClose} wide>
     <div className="attendance-modal">
@@ -47,31 +59,52 @@ export default function AttendanceModal({ session, players, attendance, onSave, 
           <p>{session.category} · {session.duration}'</p>
         </div>
         <div className="attendance-counts">
-          <span><b>{present}</b>PRESENTI</span>
-          <span><b>{Math.max(0,total-present)}</b>ASSENTI</span>
-          <span><b>{total}</b>TOTALI</span>
+          <span><b>{presentIds.size}</b>PRESENTI</span>
+          <span><b>{Math.max(0,total-presentIds.size)}</b>NON SELEZIONATI</span>
+          <span><b>{total}</b>TESSERATI</span>
         </div>
       </header>
 
-      <section className="attendance-toolbar">
-        <input placeholder="CERCA GIOCATORE…" value={query} onChange={event=>setQuery(event.target.value)}/>
-        <button type="button" className="soft" onClick={selectAll}>SELEZIONA TUTTI</button>
-        <button type="button" className="soft" onClick={clearAll}>AZZERA</button>
+      <section className="attendance-toolbar attendance-toolbar-wide">
+        <select value={categoryFilter} onChange={event=>setCategoryFilter(event.target.value)}>
+          <option value="">TUTTE LE CATEGORIE</option>
+          {CATEGORIES.map(value=><option key={value}>{value}</option>)}
+        </select>
+        <input
+          placeholder="CERCA GIOCATORE…"
+          value={query}
+          onChange={event=>setQuery(event.target.value)}
+        />
+        <button type="button" className="soft" onClick={selectVisible}>SELEZIONA VISIBILI</button>
+        <button type="button" className="soft" onClick={clearVisible}>AZZERA VISIBILI</button>
+      </section>
+
+      <section className="attendance-selected-summary">
+        <b>{selectedPlayers.length} GIOCATORI SELEZIONATI</b>
+        <span>
+          {selectedPlayers.length
+            ? selectedPlayers.map(player => `${player.lastName} ${player.firstName} (${player.category})`).join(' · ')
+            : 'NESSUN GIOCATORE SELEZIONATO'}
+        </span>
       </section>
 
       <section className="attendance-list">
-        {!categoryPlayers.length && <div className="app-empty"><b>NESSUN TESSERATO IN QUESTA CATEGORIA</b><span>IL DIRETTORE DEVE PRIMA INSERIRE I GIOCATORI NELL’ANAGRAFICA TESSERATI.</span></div>}
+        {!activePlayers.length && <div className="app-empty"><b>NESSUN TESSERATO DISPONIBILE</b><span>IL DIRETTORE DEVE PRIMA INSERIRE I GIOCATORI NELL’ANAGRAFICA TESSERATI.</span></div>}
+        {activePlayers.length > 0 && !visible.length && <div className="app-empty"><b>NESSUN GIOCATORE TROVATO</b><span>MODIFICA IL FILTRO CATEGORIA O LA RICERCA.</span></div>}
         {visible.map(player=><label key={player.id} className={presentIds.has(player.id) ? 'present' : ''}>
           <input type="checkbox" checked={presentIds.has(player.id)} onChange={()=>toggle(player.id)}/>
           <span className="attendance-box">✓</span>
           <span className="attendance-number">{player.shirtNumber === '' ? '—' : player.shirtNumber}</span>
-          <b>{player.lastName} {player.firstName}</b>
+          <span className="attendance-player-row">
+            <b>{player.lastName} {player.firstName}</b>
+            <small>{player.category}</small>
+          </span>
         </label>)}
       </section>
 
       <footer>
         <button type="button" className="ghost" onClick={onClose}>ANNULLA</button>
-        <button type="button" onClick={()=>onSave([...presentIds])} disabled={!categoryPlayers.length}>SALVA PRESENZE</button>
+        <button type="button" onClick={()=>onSave([...presentIds])} disabled={!activePlayers.length}>SALVA PRESENZE</button>
       </footer>
     </div>
   </Modal>

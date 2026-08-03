@@ -561,6 +561,8 @@ export default function App() {
       const result = await generateSessionPdf({
         session,
         exercises:sessionExercises,
+        players:archive.players || [],
+        presentIds:archive.attendanceBySession?.[session.id]?.presentIds || [],
         logoUrl:`${window.location.origin}${import.meta.env.BASE_URL}logo-acquacetosa.png`,
         appUrl:`${window.location.origin}${window.location.pathname}`,
       })
