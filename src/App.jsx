@@ -102,9 +102,9 @@ export default function App() {
   const isCoach = role === 'coach'
   const isCollaborator = role === 'collaborator'
   const canWrite = Boolean(profile?.active) && !isCollaborator
-  const canDelete = Boolean(profile?.active) && (isDirector || isCoordinator)
+  const canDelete = Boolean(profile?.active) && isDirector
   const canManageUsers = Boolean(profile?.active) && isDirector
-  const canRate = Boolean(profile?.active) && (isDirector || isCoordinator)
+  const canRate = Boolean(profile?.active) && canWrite
   const assignedCategories = useMemo(() => {
     if (!profile) return []
     if (isDirector || isCoordinator) return CATEGORIES
@@ -585,11 +585,10 @@ export default function App() {
   }
 
   function deleteSession(id) {
-    if (!canDelete) { window.alert('SOLO DIRETTORE E COORDINATORE POSSONO ELIMINARE LE SESSIONI.'); return }
+    if (!canDelete) { window.alert('SOLO IL DIRETTORE PUÒ ELIMINARE LE SESSIONI.'); return }
     const session = archive.sessions.find(s => s.id === id)
     const count = archive.exercises.filter(e => e.sessionId === id).length
     if(!confirm(`ELIMINARE LA SESSIONE E LE ${count} ESERCITAZIONI AL SUO INTERNO?`)) return
-    if(!authorize('PASSWORD PER ELIMINARE LA SESSIONE:')) return
     commit(a=>({...a,sessions:a.sessions.filter(s=>s.id!==id),exercises:a.exercises.filter(e=>e.sessionId!==id)}), 'ELIMINA SESSIONE', session?.coach, { objectType:'SESSIONE', objectId:id, category:session?.category, metadata:{exerciseCount:count} })
   }
 
@@ -604,7 +603,7 @@ export default function App() {
     const previous = archive.exercises.find(exercise => String(exercise.id) === String(item.id))
     const ratingChanged = Number(item.rating || 0) !== Number((previous && previous.rating) || 0)
     if (ratingChanged && Number(item.rating || 0) > 0 && !canRate) {
-      window.alert('SOLO DIRETTORE E COORDINATORE POSSONO MODIFICARE LA VALUTAZIONE.')
+      window.alert('IL TUO RUOLO NON CONSENTE DI MODIFICARE LA VALUTAZIONE.')
       throw new Error('VALUTAZIONE NON AUTORIZZATA')
     }
     if (ratingChanged && Number(item.rating || 0) > 0 && !authorize('PASSWORD PER SALVARE LA VALUTAZIONE:')) {
@@ -670,10 +669,9 @@ export default function App() {
   }
 
   async function deleteExercise(id) {
-    if (!canDelete) { window.alert('SOLO DIRETTORE E COORDINATORE POSSONO ELIMINARE ESERCITAZIONI.'); return }
+    if (!canDelete) { window.alert('SOLO IL DIRETTORE PUÒ ELIMINARE LE ESERCITAZIONI.'); return }
     const item = archive.exercises.find(e => e.id === id)
     if(!confirm('ELIMINARE QUESTA ESERCITAZIONE?')) return
-    if(!authorize("PASSWORD PER ELIMINARE L'ESERCITAZIONE:")) return
     try { if(item?.imagePath) await removeCloudFile(item.imagePath) } catch(error){ console.error(error) }
     commit(a=>({...a,exercises:a.exercises.filter(e=>e.id!==id)}), 'ELIMINA ESERCITAZIONE', item?.title, { objectType:'ESERCITAZIONE', objectId:id, category:item?.category })
   }
@@ -684,7 +682,7 @@ export default function App() {
   }
 
   async function deleteDocument(type,item){
-    if (!canDelete) { window.alert('SOLO DIRETTORE E COORDINATORE POSSONO ELIMINARE DOCUMENTI.'); return }
+    if (!canDelete) { window.alert('SOLO IL DIRETTORE PUÒ ELIMINARE DOCUMENTI.'); return }
     if(!authorize('PASSWORD PER ELIMINARE IL FILE:')) return
     try{ if(item.storagePath) await removeCloudFile(item.storagePath) }catch(error){console.error(error);alert('FILE RIMOSSO DALL’ARCHIVIO, MA NON DALLO STORAGE.')}
     commit(a=>({...a,documents:{...a.documents,[type]:(a.documents[type]||[]).filter(x=>x.id!==item.id)}}),'ELIMINA DOCUMENTO',item.title, { objectType:'DOCUMENTO', objectId:item.id, metadata:{type} })
@@ -757,8 +755,13 @@ export default function App() {
         <small>ARCHIVIO METODOLOGICO ACQUACETOSA</small>
         <h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1>
       </div>
-      <img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`} alt="Acquacetosa"/>
-      <b>2026/27</b>
+      <div className="hero-brand-block">
+        <div className="hero-brand-top">
+          <b>2026/27</b>
+          <img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`} alt="Acquacetosa"/>
+        </div>
+        <button className="hero-exit" onClick={()=>supabase.auth.signOut()}>ESCI</button>
+      </div>
       <nav>
         {canWrite && <button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button>}
         <button onClick={()=>setDocumentModal('meetings')}>RIUNIONI TECNICHE</button>
@@ -774,8 +777,6 @@ export default function App() {
 
         {isDirector && <button className="glass admin-button" onClick={()=>setBackupsOpen(true)}>BACKUP</button>}
         {isDirector && <button className="glass admin-button" onClick={()=>setUsersOpen(true)}>UTENTI</button>}
-
-        <button className="glass" onClick={()=>supabase.auth.signOut()}>ESCI</button>
       </nav>
     </header>
     <section className="profile-bar">
@@ -783,7 +784,6 @@ export default function App() {
       <div><b>{upper([profile.first_name,profile.last_name].filter(Boolean).join(' ') || auth.user.email)}</b><span>{upper(profile.role)}{profile.coach_name ? ` · ${profile.coach_name}` : ''}</span></div>
       <div className="profile-categories">{visibleCategories.map(category=><span key={category}>{category}</span>)}</div>
     </section>
-    <section className="history-bar">{canWrite && <button onClick={undo} disabled={!undoStack.current.length}>↶ ANNULLA</button>}{canWrite && <button onClick={redo} disabled={!redoStack.current.length}>↷ RIPRISTINA</button>}<button onClick={()=>setAuditOpen(true)}>CRONOLOGIA</button><span>⌘Z / CTRL+Z · CRONOLOGIA FINO A 100 MODIFICHE</span></section>
     <section className="filters"><input placeholder="CERCA PER TITOLO, OBIETTIVO O PAROLA CHIAVE…" value={search} onChange={e=>setSearch(e.target.value)}/><select value={coach} onChange={e=>setCoach(e.target.value)}><option value="">ALLENATORI</option>{COACHES.map(v=><option key={v}>{v}</option>)}</select><select value={selectedCategory} onChange={e=>setSelectedCategory(e.target.value)}><option value="">CATEGORIE</option>{visibleCategories.map(v=><option key={v}>{v}</option>)}</select><select value={rating} onChange={e=>setRating(e.target.value)}><option value="">VALUTAZIONI</option>{[1,2,3,4,5].map(v=><option key={v} value={v}>{v} STELLE</option>)}</select><select value={phase} onChange={e=>setPhase(e.target.value)}><option value="">FASE ALLENAMENTO</option>{PHASES.map(v=><option key={v}>{v}</option>)}</select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="recent">PIÙ RECENTI</option><option value="az">A-Z</option><option value="players">N° GIOCATORI</option></select><button className="reset-filters" onClick={resetFilters}>AZZERA FILTRI</button></section>
     <section className="category-strip"><button className={!selectedCategory?'active':''} onClick={()=>setSelectedCategory('')}><span>▦</span><b>ARCHIVIO COMPLETO</b><small>{archive.sessions.length}SS / {archive.exercises.length}ES</small></button>{visibleCategories.map(c=>{const ss=archive.sessions.filter(s=>s.category===c).length,es=archive.exercises.filter(e=>e.category===c).length;return <button key={c} className={selectedCategory===c?'active':''} onClick={()=>setSelectedCategory(c)}><span>⚽</span><b>{c}</b><small>{ss}SS / {es}ES</small></button>})}</section>
     <nav className="view-tabs"><button className={view==='sessions'?'active':''} onClick={()=>setView('sessions')}>SESSIONI ALLENAMENTO</button><button className={view==='library'?'active':''} onClick={()=>setView('library')}>LIBRERIA ESERCITAZIONI</button>{selectedCategory&&<button className={view==='matches'?'active':''} onClick={()=>setView('matches')}>PARTITE</button>}</nav>
@@ -797,7 +797,7 @@ export default function App() {
 </div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
     {view==='library' && <main><div className="section-title"><div><h2>LIBRERIA ESERCITAZIONI</h2><p>TUTTE LE ESERCITAZIONI DELL’ARCHIVIO.</p></div><b>{filteredExercises.length} ESERCITAZIONI</b></div>{!filteredExercises.length && <EmptyState title="NESSUNA ESERCITAZIONE TROVATA" text="MODIFICA I FILTRI O AGGIUNGI UNA ESERCITAZIONE."/>}<div className="exercise-grid library">{filteredExercises.map(e=>{const s=archive.sessions.find(x=>x.id===e.sessionId);return <ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>s&&setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>})}</div></main>}
     {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} readOnly={!canWrite} onChange={items=>{if(!canWrite)return;commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory, { objectType:'CALENDARIO PARTITE', category:selectedCategory })}}/></main>}
-    <div className="build-badge">FASE 4B · PREVIEW PDF</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
+    <div className="build-badge">FASE 4C · UI</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
     {toast && <div className="action-toast">{toast}</div>}
     {auditOpen && <AuditModal items={archive.audit||[]} onClose={()=>setAuditOpen(false)}/>}
     {sessionModal && <SessionModal initial={sessionModal.id?sessionModal:null} allowedCategories={visibleCategories} fixedCoach={isCoach?profileCoach:''} canChooseCoach={!isCoach} onSave={saveSession} onClose={()=>setSessionModal(null)}/>} 

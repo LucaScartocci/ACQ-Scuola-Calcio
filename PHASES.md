@@ -1,6 +1,7 @@
 # Stato progetto
 
-- Fase 4A: PDF professionale della seduta con QR Code
-- Fase 4B: pulizia menu, permessi amministrativi e anteprima PDF
+- Fase 4A: PDF professionale con QR Code
+- Fase 4B: anteprima PDF e pulizia menu
+- Fase 4C: permessi eliminazione, header e pulizia interfaccia
 
-Il gestionale entra ora nella fase di rifinitura e collaudo finale.
+Il gestionale è ora nella fase di collaudo e rifinitura finale.
