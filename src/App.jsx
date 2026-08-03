@@ -8,6 +8,8 @@ import Login from './components/Login'
 import SessionModal from './components/SessionModal'
 import ExerciseModal from './components/ExerciseModal'
 import Matches from './components/Matches'
+import DocumentLibrary from './components/DocumentLibrary'
+import { removeCloudFile, uploadCloudFile } from './lib/storage'
 import './styles.css'
 
 const HISTORY_LIMIT = 100
@@ -26,6 +28,7 @@ export default function App() {
   const [sort, setSort] = useState('recent')
   const [sessionModal, setSessionModal] = useState(null)
   const [exerciseModal, setExerciseModal] = useState(null)
+  const [documentModal, setDocumentModal] = useState(null)
   const [toast, setToast] = useState('')
   const saveTimer = useRef(null)
   const applyingRemote = useRef(false)
@@ -169,20 +172,43 @@ export default function App() {
     commit(a=>({...a,sessions:a.sessions.filter(s=>s.id!==id),exercises:a.exercises.filter(e=>e.sessionId!==id)}), 'ELIMINA SESSIONE', session?.coach)
   }
 
-  function saveExercise(item, initial) {
+  async function saveExercise(item, initial) {
     const previous = archive.exercises.find(e => e.id === item.id)
     const ratingChanged = Number(item.rating || 0) !== Number(previous?.rating || 0)
     if (ratingChanged && Number(item.rating || 0) > 0 && !authorize('PASSWORD PER SALVARE LA VALUTAZIONE:')) return
-    const exists = Boolean(previous)
-    commit(a=>({...a,exercises:exists?a.exercises.map(e=>e.id===item.id?item:e):[...a.exercises,item]}), exists ? 'MODIFICA ESERCITAZIONE' : 'CREA ESERCITAZIONE', item.title)
-    setExerciseModal(null)
+    try {
+      let image=item.image||previous?.image||''
+      let imagePath=item.imagePath||previous?.imagePath||''
+      if(item.removeImage && imagePath){ await removeCloudFile(imagePath); image=''; imagePath='' }
+      if(item.imageFile){
+        if(imagePath) await removeCloudFile(imagePath)
+        const uploaded=await uploadCloudFile(item.imageFile,`esercitazioni/${item.category.toLowerCase().replaceAll(' ','-')}`)
+        image=uploaded.url; imagePath=uploaded.storagePath
+      }
+      const clean={...item,image,imagePath}
+      delete clean.imageFile; delete clean.removeImage
+      const exists = Boolean(previous)
+      commit(a=>({...a,exercises:exists?a.exercises.map(e=>e.id===clean.id?clean:e):[...a.exercises,clean]}), exists ? 'MODIFICA ESERCITAZIONE' : 'CREA ESERCITAZIONE', clean.title)
+      setExerciseModal(null)
+    } catch(error){console.error(error);alert('SALVATAGGIO IMMAGINE NON RIUSCITO: '+error.message)}
   }
 
-  function deleteExercise(id) {
+  async function deleteExercise(id) {
     const item = archive.exercises.find(e => e.id === id)
     if(!confirm('ELIMINARE QUESTA ESERCITAZIONE?')) return
     if(!authorize("PASSWORD PER ELIMINARE L'ESERCITAZIONE:")) return
+    try { if(item?.imagePath) await removeCloudFile(item.imagePath) } catch(error){ console.error(error) }
     commit(a=>({...a,exercises:a.exercises.filter(e=>e.id!==id)}), 'ELIMINA ESERCITAZIONE', item?.title)
+  }
+
+  function addDocuments(type, items){
+    commit(a=>({...a,documents:{...a.documents,[type]:[...(a.documents[type]||[]),...items]}}),'CARICA DOCUMENTI',type)
+  }
+
+  async function deleteDocument(type,item){
+    if(!authorize('PASSWORD PER ELIMINARE IL FILE:')) return
+    try{ if(item.storagePath) await removeCloudFile(item.storagePath) }catch(error){console.error(error);alert('FILE RIMOSSO DALL’ARCHIVIO, MA NON DALLO STORAGE.')}
+    commit(a=>({...a,documents:{...a.documents,[type]:(a.documents[type]||[]).filter(x=>x.id!==item.id)}}),'ELIMINA DOCUMENTO',item.title)
   }
 
   function exportArchive() {
@@ -225,7 +251,7 @@ export default function App() {
   if(!auth) return <Login />
 
   return <div className="app-shell">
-    <header className="hero"><div><small>ARCHIVIO METODOLOGICO ACQUACETOSA</small><h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1></div><img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`}/><b>2026/27</b><nav><button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button><button>RIUNIONI TECNICHE</button><button>MATERIALE DIDATTICO</button><button className="glass" onClick={exportArchive}>ESPORTA</button><button className="glass" onClick={()=>fileInput.current?.click()}>IMPORTA</button>{legacyArchive && <button className="glass" onClick={migrateLegacy}>MIGRA V23</button>}<button className="glass" onClick={()=>supabase.auth.signOut()}>ESCI</button><input ref={fileInput} hidden type="file" accept="application/json,.json" onChange={e=>importArchive(e.target.files?.[0])}/></nav></header>
+    <header className="hero"><div><small>ARCHIVIO METODOLOGICO ACQUACETOSA</small><h1>SCUOLA CALCIO<br/>ACQUACETOSA</h1></div><img src={`${import.meta.env.BASE_URL}logo-acquacetosa.png`}/><b>2026/27</b><nav><button onClick={()=>setSessionModal({})}>＋ SESSIONE ALLENAMENTO</button><button onClick={()=>setDocumentModal('meetings')}>RIUNIONI TECNICHE</button><button onClick={()=>setDocumentModal('teaching')}>MATERIALE DIDATTICO</button><button className="glass" onClick={exportArchive}>ESPORTA</button><button className="glass" onClick={()=>fileInput.current?.click()}>IMPORTA</button>{legacyArchive && <button className="glass" onClick={migrateLegacy}>MIGRA V23</button>}<button className="glass" onClick={()=>supabase.auth.signOut()}>ESCI</button><input ref={fileInput} hidden type="file" accept="application/json,.json" onChange={e=>importArchive(e.target.files?.[0])}/></nav></header>
     <section className="history-bar"><button onClick={undo} disabled={!undoStack.current.length}>↶ ANNULLA</button><button onClick={redo} disabled={!redoStack.current.length}>↷ RIPRISTINA</button><span>⌘Z / CTRL+Z · CRONOLOGIA FINO A 100 MODIFICHE</span></section>
     <section className="filters"><input placeholder="CERCA PER TITOLO, OBIETTIVO O PAROLA CHIAVE…" value={search} onChange={e=>setSearch(e.target.value)}/><select value={coach} onChange={e=>setCoach(e.target.value)}><option value="">ALLENATORI</option>{COACHES.map(v=><option key={v}>{v}</option>)}</select><select value={selectedCategory} onChange={e=>setSelectedCategory(e.target.value)}><option value="">CATEGORIE</option>{CATEGORIES.map(v=><option key={v}>{v}</option>)}</select><select value={rating} onChange={e=>setRating(e.target.value)}><option value="">VALUTAZIONI</option>{[1,2,3,4,5].map(v=><option key={v} value={v}>{v} STELLE</option>)}</select><select value={phase} onChange={e=>setPhase(e.target.value)}><option value="">FASE ALLENAMENTO</option>{PHASES.map(v=><option key={v}>{v}</option>)}</select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="recent">PIÙ RECENTI</option><option value="az">A-Z</option><option value="players">N° GIOCATORI</option></select></section>
     <section className="category-strip"><button className={!selectedCategory?'active':''} onClick={()=>setSelectedCategory('')}><span>▦</span><b>ARCHIVIO COMPLETO</b><small>{archive.sessions.length}SS / {archive.exercises.length}ES</small></button>{CATEGORIES.map(c=>{const ss=archive.sessions.filter(s=>s.category===c).length,es=archive.exercises.filter(e=>e.category===c).length;return <button key={c} className={selectedCategory===c?'active':''} onClick={()=>setSelectedCategory(c)}><span>⚽</span><b>{c}</b><small>{ss}SS / {es}ES</small></button>})}</section>
@@ -237,6 +263,7 @@ export default function App() {
     {toast && <div className="action-toast">{toast}</div>}
     {sessionModal && <SessionModal initial={sessionModal.id?sessionModal:null} onSave={saveSession} onClose={()=>setSessionModal(null)}/>} 
     {exerciseModal && <ExerciseModal session={exerciseModal.session} initial={exerciseModal.initial} onSave={saveExercise} onClose={()=>setExerciseModal(null)}/>} 
+    {documentModal && <DocumentLibrary type={documentModal} items={archive.documents[documentModal]||[]} onAdd={items=>addDocuments(documentModal,items)} onDelete={item=>deleteDocument(documentModal,item)} onClose={()=>setDocumentModal(null)}/>} 
   </div>
 }
 

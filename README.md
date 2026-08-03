@@ -1,18 +1,18 @@
-# ACQ Scuola Calcio v24 Cloud — Fase 2A
+# ACQ Scuola Calcio v24 Cloud · Fase 2B
 
-Release React/Vite collegata a Supabase e pronta per GitHub Pages.
+Aggiunge Supabase Storage per immagini e documenti, Riunioni tecniche e Materiale didattico.
 
-## Novità Fase 2A
+## Operazione obbligatoria su Supabase
+Apri `supabase_setup.sql`, copia **solo la sezione FASE 2B** oppure riesegui l’intero file nel SQL Editor. Lo script è idempotente.
 
-- backup JSON con Esporta/Importa;
-- migrazione dati locali dalla v23 tramite pulsante `MIGRA V23` quando rilevati;
-- undo/redo fino a 100 modifiche;
-- `⌘Z` / `Ctrl+Z` e `⌘⇧Z` / `Ctrl+Shift+Z`;
-- password `vittoriout` per operazioni sensibili;
-- registro audit nell'archivio cloud;
-- struttura dati normalizzata e compatibile con backup precedenti.
+## Aggiornamento GitHub
+Carica tutti i file del pacchetto sovrascrivendo quelli esistenti. Il workflow GitHub Pages resta invariato.
 
-## Deploy
+## Funzioni
+- immagini esercitazioni archiviate in Supabase Storage;
+- file per riunioni tecniche e materiale didattico;
+- ricerca, apertura, download ed eliminazione protetta;
+- metadata sincronizzati in tempo reale nel database;
+- limite bucket: 50 MB per file.
 
-Sostituire nel repository i file con quelli di questo pacchetto e fare commit su `main`.
-Il workflow `.github/workflows/deploy.yml` ricostruisce automaticamente GitHub Pages.
+Nota: il bucket è pubblico in lettura per permettere la visualizzazione diretta delle immagini nel sito. Upload e cancellazione richiedono il login.

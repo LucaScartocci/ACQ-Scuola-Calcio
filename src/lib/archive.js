@@ -4,7 +4,7 @@ export const COACHES = [
 ]
 export const CATEGORIES = ['PICCOLI AMICI','PRIMI CALCI','PULCINI','ESORDIENTI']
 export const PHASES = ['ATTIVAZIONE','PARTE CENTRALE','PARTITA A TEMA']
-export const ARCHIVE_VERSION = 2
+export const ARCHIVE_VERSION = 3
 export const ADMIN_PASSWORD = 'vittoriout'
 
 const safeId = prefix => {
@@ -33,6 +33,19 @@ const normalizeCategory = value => {
   const up = upper(value)
   return CATEGORIES.find(c => c === up) || up || CATEGORIES[0]
 }
+
+
+const normalizeDocument = item => ({
+  ...item,
+  id: item.id || safeId('document'),
+  title: upper(item.title || item.name || ''),
+  name: item.name || 'FILE',
+  url: item.url || item.data || '',
+  storagePath: item.storagePath || '',
+  type: item.type || 'application/octet-stream',
+  size: Number(item.size) || 0,
+  createdAt: Number(item.createdAt || item.created) || Date.now(),
+})
 
 export const normalizeArchive = (value) => {
   const base = emptyArchive()
@@ -72,8 +85,8 @@ export const normalizeArchive = (value) => {
     matchesByCategory: value.matchesByCategory && typeof value.matchesByCategory === 'object'
       ? value.matchesByCategory : base.matchesByCategory,
     documents: {
-      meetings: Array.isArray(rawDocuments.meetings) ? rawDocuments.meetings : [],
-      teaching: Array.isArray(rawDocuments.teaching) ? rawDocuments.teaching : [],
+      meetings: Array.isArray(rawDocuments.meetings) ? rawDocuments.meetings.map(normalizeDocument) : [],
+      teaching: Array.isArray(rawDocuments.teaching) ? rawDocuments.teaching.map(normalizeDocument) : [],
     },
     audit: Array.isArray(value.audit) ? value.audit.slice(-200) : [],
     updatedAt: value.updatedAt || new Date().toISOString(),
