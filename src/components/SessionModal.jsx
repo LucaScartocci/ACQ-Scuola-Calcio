@@ -11,7 +11,9 @@ export default function SessionModal({ initial, onSave, onClose, allowedCategori
     date: '',
     duration: 90,
     players: 16,
-    objective: ''
+    field: '',
+    objective: '',
+    staffNotes: ''
   })
 
   useEffect(() => {
@@ -40,7 +42,9 @@ export default function SessionModal({ initial, onSave, onClose, allowedCategori
         id: initial?.id || uid(),
         coach: upper(fixedCoach || form.coach),
         category: form.category,
+        field: upper(form.field),
         objective: upper(form.objective),
+        staffNotes: upper(form.staffNotes),
         createdAt: initial?.createdAt || Date.now()
       })
     }}>
@@ -57,7 +61,9 @@ export default function SessionModal({ initial, onSave, onClose, allowedCategori
       <label>DATA<input type="date" value={form.date} onChange={event => change('date', event.target.value)} required /></label>
       <label>DURATA PREVISTA<input type="number" value={form.duration} onChange={event => change('duration', Number(event.target.value))} min="1" /></label>
       <label>N° GIOCATORI<input type="number" value={form.players} onChange={event => change('players', Number(event.target.value))} min="1" /></label>
+      <label>CAMPO / LUOGO<input value={form.field || ''} onChange={event => change('field', event.target.value)} placeholder="ES. CAMPO A"/></label>
       <label className="full">OBIETTIVO DELLA SEDUTA<textarea value={form.objective} onChange={event => change('objective', event.target.value)} /></label>
+      <label className="full">NOTE DELLO STAFF PER IL PDF<textarea value={form.staffNotes || ''} onChange={event => change('staffNotes', event.target.value)} placeholder="NOTE ORGANIZZATIVE, COACHING POINTS GENERALI, INDICAZIONI FINALI…"/></label>
       <footer className="modal-actions full"><button type="button" className="ghost" onClick={onClose}>ANNULLA</button><button>SALVA SESSIONE</button></footer>
     </form>
   </Modal>

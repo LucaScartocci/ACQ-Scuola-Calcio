@@ -1,23 +1,33 @@
-# ACQ Scuola Calcio v24 Cloud · Fase 3E
+# ACQ Scuola Calcio v24 Cloud · Fase 4A PDF
 
 ## Novità
 
-- Centro Backup e Ripristino
-- backup automatico ogni 6 ore in presenza di modifiche
-- backup manuale con un clic
-- backup di sicurezza prima di ogni ripristino
-- download dei singoli backup in JSON
-- elenco versioni con data, autore, dimensione e contenuti
-- ricerca e filtro per tipo
-- ripristino ed eliminazione protetti da password
-- conservazione automatica dei backup automatici per 30 giorni
-- Realtime sull’elenco backup
+- pulsante `ESPORTA PDF` su ogni sessione di allenamento
+- PDF A4 professionale multipagina
+- copertina con logo, categoria, allenatore, data, durata e giocatori
+- overview della seduta con obiettivo e distribuzione dei tempi
+- materiale complessivo e dati operativi
+- una pagina dedicata a ogni esercitazione
+- immagine o schema senza deformazioni
+- obiettivo, materiale, fase, durata, spazio, giocatori e descrizione
+- valutazione in stelle
+- QR Code per aprire direttamente l'esercitazione nel gestionale
+- pagina conclusiva con riepilogo
+- footer e numerazione automatica
+- nome file automatico
+- nuovi campi sessione: Campo/Luogo e Note dello staff
+- nuovi campi esercitazione: Coaching Points e Varianti/Progressioni
+- apertura diretta dell'esercitazione tramite link QR dopo il login
+- correzione del collegamento alla Cronologia avanzata
 
 ## Installazione
 
-1. Eseguire `supabase_phase3e.sql` in Supabase → SQL Editor.
-2. Attendere `Success`.
-3. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
-4. Attendere il deploy verde.
-5. Fare logout e login.
-6. Aprire il pulsante `BACKUP`.
+Questa fase non richiede nuove query SQL.
+
+1. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
+2. Conservare la cartella `.github`.
+3. Attendere il deploy verde.
+4. Aggiornare forzatamente la pagina oppure chiudere e riaprire la PWA.
+5. Aprire una sessione e premere `ESPORTA PDF`.
+
+GitHub Actions installerà automaticamente le nuove dipendenze `jspdf` e `qrcode`.

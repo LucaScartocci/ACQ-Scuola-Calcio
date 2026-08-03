@@ -251,3 +251,11 @@
 .backup-footer{display:flex;justify-content:space-between;gap:12px;margin-top:14px;color:#7b899c;font-size:8px;font-weight:900}
 @media(max-width:850px){.backup-heading{align-items:flex-start;flex-direction:column}.backup-heading button{width:100%}.backup-filters{grid-template-columns:1fr 1fr}.backup-filters>input{grid-column:1/-1}}
 @media(max-width:650px){.backup-center{padding:12px}.backup-filters{grid-template-columns:1fr}.backup-filters>input{grid-column:auto}.backup-list{max-height:none}.backup-list>article{grid-template-columns:44px 1fr}.backup-actions{grid-column:1/-1;min-width:0}}
+
+/* FASE 4A: PDF PROFESSIONALE SEDUTA */
+.pdf-session-button{background:linear-gradient(135deg,#071b34,#0f5cc0)!important;color:#fff!important;border-color:transparent!important;min-width:126px}
+.pdf-session-button:disabled{opacity:.55;cursor:wait}
+@media(max-width:650px){
+  .session-card>header>div:last-child{display:grid!important;grid-template-columns:1fr 1fr!important;width:100%}
+  .session-card>header>div:last-child .pdf-session-button{grid-column:1/-1}
+}

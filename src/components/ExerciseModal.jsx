@@ -18,6 +18,8 @@ export default function ExerciseModal({ session, initial, onSave, onClose }) {
     equipment: '',
     objective: '',
     description: '',
+    coaching: '',
+    variants: '',
     rating: 0,
     image: '',
     imagePath: '',
@@ -79,6 +81,8 @@ export default function ExerciseModal({ session, initial, onSave, onClose }) {
         equipment: upper(form.equipment),
         objective: upper(form.objective),
         description: upper(form.description),
+        coaching: upper(form.coaching),
+        variants: upper(form.variants),
         players: Number(form.players) || safeSession.players,
         duration: Number(form.duration) || 20,
         rating: Number(form.rating) || 0,
@@ -137,6 +141,14 @@ export default function ExerciseModal({ session, initial, onSave, onClose }) {
 
       <label className="full">ORGANIZZAZIONE E SVOLGIMENTO
         <textarea value={form.description} onChange={event => set('description', event.target.value)} />
+      </label>
+
+      <label className="full">COACHING POINTS
+        <textarea value={form.coaching || ''} onChange={event => set('coaching', event.target.value)} />
+      </label>
+
+      <label className="full">VARIANTI / PROGRESSIONI
+        <textarea value={form.variants || ''} onChange={event => set('variants', event.target.value)} />
       </label>
 
       <label className="full">VALUTAZIONE

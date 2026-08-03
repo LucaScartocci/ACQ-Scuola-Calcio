@@ -16,6 +16,7 @@ import StatisticsDashboard from './components/StatisticsDashboard'
 import NotificationCenter from './components/NotificationCenter'
 import BackupCenter from './components/BackupCenter'
 import { removeCloudFile, uploadCloudFile } from './lib/storage'
+import { generateSessionPdf } from './lib/sessionPdf'
 import './styles.css'
 
 const HISTORY_LIMIT = 100
@@ -49,6 +50,7 @@ export default function App() {
   const [notificationReadIds, setNotificationReadIds] = useState(new Set())
   const [notificationsLoading, setNotificationsLoading] = useState(false)
   const [backupsOpen, setBackupsOpen] = useState(false)
+  const [pdfBusySessionId, setPdfBusySessionId] = useState('')
   const saveTimer = useRef(null)
   const applyingRemote = useRef(false)
   const undoStack = useRef([])
@@ -526,6 +528,31 @@ export default function App() {
     showToast('ARCHIVIO RIPRISTINATO')
   }
 
+  async function exportSessionPdf(session) {
+    const sessionExercises = archive.exercises.filter(exercise => String(exercise.sessionId) === String(session.id))
+    setPdfBusySessionId(session.id)
+    try {
+      const result = await generateSessionPdf({
+        session,
+        exercises:sessionExercises,
+        logoUrl:`${window.location.origin}${import.meta.env.BASE_URL}logo-acquacetosa.png`,
+        appUrl:`${window.location.origin}${window.location.pathname}`,
+      })
+      await writeAuditLog('ESPORTA PDF SEDUTA', result.filename, {
+        objectType:'SESSIONE',
+        objectId:session.id,
+        category:session.category,
+        metadata:{pages:result.pages,exercises:result.exercises}
+      })
+      showToast('PDF SEDUTA GENERATO')
+    } catch (error) {
+      console.error('PDF SESSION ERROR', error)
+      window.alert('GENERAZIONE PDF NON RIUSCITA: ' + (error.message || 'ERRORE SCONOSCIUTO'))
+    } finally {
+      setPdfBusySessionId('')
+    }
+  }
+
   function openNewExercise(session) {
     if (!session || !session.id) {
       showToast('SESSIONE NON ANCORA DISPONIBILE. ATTENDI UN ISTANTE E RIPROVA.')
@@ -686,6 +713,25 @@ export default function App() {
     showToast('DATI V23 MIGRATI NEL CLOUD')
   }
 
+  useEffect(() => {
+    if (!hydrated || !profile) return
+
+    const openFromHash = () => {
+      const match = window.location.hash.match(/^#exercise=(.+)$/)
+      if (!match) return
+      const exerciseId = decodeURIComponent(match[1])
+      const exercise = archive.exercises.find(item => String(item.id) === String(exerciseId))
+      if (!exercise) return
+      const session = archive.sessions.find(item => String(item.id) === String(exercise.sessionId))
+      if (!session) return
+      setExerciseModal({session,initial:exercise})
+    }
+
+    openFromHash()
+    window.addEventListener('hashchange', openFromHash)
+    return () => window.removeEventListener('hashchange', openFromHash)
+  }, [hydrated, profile, archive.sessions, archive.exercises])
+
   if(auth===undefined) return <div className="loading">CARICAMENTO…</div>
   if(!auth) return <Login />
   if(profileLoading || !profile) return <div className="loading">CARICAMENTO PROFILO UTENTE…</div>
@@ -706,10 +752,17 @@ export default function App() {
     <section className="filters"><input placeholder="CERCA PER TITOLO, OBIETTIVO O PAROLA CHIAVE…" value={search} onChange={e=>setSearch(e.target.value)}/><select value={coach} onChange={e=>setCoach(e.target.value)}><option value="">ALLENATORI</option>{COACHES.map(v=><option key={v}>{v}</option>)}</select><select value={selectedCategory} onChange={e=>setSelectedCategory(e.target.value)}><option value="">CATEGORIE</option>{visibleCategories.map(v=><option key={v}>{v}</option>)}</select><select value={rating} onChange={e=>setRating(e.target.value)}><option value="">VALUTAZIONI</option>{[1,2,3,4,5].map(v=><option key={v} value={v}>{v} STELLE</option>)}</select><select value={phase} onChange={e=>setPhase(e.target.value)}><option value="">FASE ALLENAMENTO</option>{PHASES.map(v=><option key={v}>{v}</option>)}</select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="recent">PIÙ RECENTI</option><option value="az">A-Z</option><option value="players">N° GIOCATORI</option></select><button className="reset-filters" onClick={resetFilters}>AZZERA FILTRI</button></section>
     <section className="category-strip"><button className={!selectedCategory?'active':''} onClick={()=>setSelectedCategory('')}><span>▦</span><b>ARCHIVIO COMPLETO</b><small>{archive.sessions.length}SS / {archive.exercises.length}ES</small></button>{visibleCategories.map(c=>{const ss=archive.sessions.filter(s=>s.category===c).length,es=archive.exercises.filter(e=>e.category===c).length;return <button key={c} className={selectedCategory===c?'active':''} onClick={()=>setSelectedCategory(c)}><span>⚽</span><b>{c}</b><small>{ss}SS / {es}ES</small></button>})}</section>
     <nav className="view-tabs"><button className={view==='sessions'?'active':''} onClick={()=>setView('sessions')}>SESSIONI ALLENAMENTO</button><button className={view==='library'?'active':''} onClick={()=>setView('library')}>LIBRERIA ESERCITAZIONI</button>{selectedCategory&&<button className={view==='matches'?'active':''} onClick={()=>setView('matches')}>PARTITE</button>}</nav>
-    {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}'</p></div><div>{canWrite && <button onClick={()=>openNewExercise(s)}>＋ ESERCITAZIONE</button>}{canWrite && <button className="soft" onClick={()=>setSessionModal(s)}>MODIFICA</button>}{canDelete && <button className="soft" onClick={()=>deleteSession(s.id)}>ELIMINA</button>}</div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
+    {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}'</p></div><div>
+  <button className="pdf-session-button" onClick={()=>exportSessionPdf(s)} disabled={pdfBusySessionId===s.id}>
+    {pdfBusySessionId===s.id ? 'CREAZIONE PDF…' : 'ESPORTA PDF'}
+  </button>
+  {canWrite && <button onClick={()=>openNewExercise(s)}>＋ ESERCITAZIONE</button>}
+  {canWrite && <button className="soft" onClick={()=>setSessionModal(s)}>MODIFICA</button>}
+  {canDelete && <button className="soft" onClick={()=>deleteSession(s.id)}>ELIMINA</button>}
+</div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
     {view==='library' && <main><div className="section-title"><div><h2>LIBRERIA ESERCITAZIONI</h2><p>TUTTE LE ESERCITAZIONI DELL’ARCHIVIO.</p></div><b>{filteredExercises.length} ESERCITAZIONI</b></div>{!filteredExercises.length && <EmptyState title="NESSUNA ESERCITAZIONE TROVATA" text="MODIFICA I FILTRI O AGGIUNGI UNA ESERCITAZIONE."/>}<div className="exercise-grid library">{filteredExercises.map(e=>{const s=archive.sessions.find(x=>x.id===e.sessionId);return <ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>s&&setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>})}</div></main>}
     {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} readOnly={!canWrite} onChange={items=>{if(!canWrite)return;commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory, { objectType:'CALENDARIO PARTITE', category:selectedCategory })}}/></main>}
-    <div className="build-badge">FASE 3E</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
+    <div className="build-badge">FASE 4A · PDF</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
     {toast && <div className="action-toast">{toast}</div>}
     {auditOpen && <AuditModal items={archive.audit||[]} onClose={()=>setAuditOpen(false)}/>}
     {sessionModal && <SessionModal initial={sessionModal.id?sessionModal:null} allowedCategories={visibleCategories} fixedCoach={isCoach?profileCoach:''} canChooseCoach={!isCoach} onSave={saveSession} onClose={()=>setSessionModal(null)}/>} 
