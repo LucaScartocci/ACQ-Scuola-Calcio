@@ -87,8 +87,16 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const online = () => { setIsOnline(true); setStatus('CONNESSIONE RIPRISTINATA') }
-    const offline = () => { setIsOnline(false); setStatus('MODALITÀ OFFLINE') }
+    const online = () => {
+      setIsOnline(true)
+      setStatus('ARCHIVIO SINCRONIZZATO')
+      showToast('CONNESSIONE RIPRISTINATA')
+    }
+    const offline = () => {
+      setIsOnline(false)
+      setStatus('MODALITÀ OFFLINE')
+      showToast('MODALITÀ OFFLINE')
+    }
     const beforeInstall = event => { event.preventDefault(); setInstallPrompt(event) }
     window.addEventListener('online', online)
     window.addEventListener('offline', offline)
@@ -310,16 +318,20 @@ export default function App() {
       channel = supabase.channel('acq-v24').on('postgres_changes',{event:'*',schema:'public',table:'app_state',filter:`id=eq.${CLOUD_STATE_ID}`}, payload => {
         if (!payload.new || !payload.new.data || applyingRemote.current) return
         const next = normalizeArchive(payload.new.data)
+        let applied = false
         setArchive(current => {
           const currentTime = Date.parse(current.updatedAt || '') || 0
           const nextTime = Date.parse(next.updatedAt || '') || 0
           if (currentTime && nextTime && nextTime <= currentTime) return current
+          applied = true
           archiveRef.current = next
           localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(next))
           return next
         })
-        setStatus('AGGIORNATO DA ALTRO DISPOSITIVO')
-        window.setTimeout(() => setStatus('ARCHIVIO SINCRONIZZATO'), 1800)
+        if (applied) {
+          setStatus('ARCHIVIO SINCRONIZZATO')
+          showToast('AGGIORNATO DA ALTRO DISPOSITIVO')
+        }
       }).subscribe()
     }
     start()
@@ -906,16 +918,98 @@ export default function App() {
     commit(a=>({...a,exercises:a.exercises.filter(e=>e.id!==id)}), 'ELIMINA ESERCITAZIONE', item?.title, { objectType:'ESERCITAZIONE', objectId:id, category:item?.category })
   }
 
-  function addDocuments(type, items){
-    if (!canWrite) { window.alert('IL TUO RUOLO È IN SOLA LETTURA.'); return }
-    commit(a=>({...a,documents:{...a.documents,[type]:[...(a.documents[type]||[]),...items]}}),'CARICA DOCUMENTI',type, { objectType:'DOCUMENTO', metadata:{count:items.length,type} })
+  async function addDocuments(type, items){
+    if (!canWrite) {
+      window.alert('IL TUO RUOLO È IN SOLA LETTURA.')
+      throw new Error('PERMESSO NEGATO')
+    }
+    if (!Array.isArray(items) || !items.length) return
+
+    const currentArchive = archiveRef.current
+    const nextArchive = normalizeArchive({
+      ...currentArchive,
+      documents:{
+        ...currentArchive.documents,
+        [type]:[...(currentArchive.documents?.[type] || []), ...items]
+      },
+      audit:[
+        ...(currentArchive.audit || []),
+        makeAuditEntry(
+          'CARICA DOCUMENTI',
+          type,
+          profile || {email:auth?.user?.email}
+        )
+      ].slice(-200),
+      updatedAt:new Date().toISOString(),
+    })
+
+    await persistArchiveImmediately(
+      nextArchive,
+      'DOCUMENTI SALVATI',
+      'DOCUMENTI SALVATI IN LOCALE'
+    )
+
+    await writeAuditLog(
+      'CARICA DOCUMENTI',
+      type,
+      {
+        objectType:'DOCUMENTO',
+        metadata:{count:items.length,type}
+      }
+    )
+
+    showToast(items.length === 1 ? 'DOCUMENTO SALVATO' : `${items.length} DOCUMENTI SALVATI`)
   }
 
   async function deleteDocument(type,item){
-    if (!canDelete) { window.alert('SOLO IL DIRETTORE PUÒ ELIMINARE DOCUMENTI.'); return }
-    if(!authorize('PASSWORD PER ELIMINARE IL FILE:')) return
-    try{ if(item.storagePath) await removeCloudFile(item.storagePath) }catch(error){console.error(error);alert('FILE RIMOSSO DALL’ARCHIVIO, MA NON DALLO STORAGE.')}
-    commit(a=>({...a,documents:{...a.documents,[type]:(a.documents[type]||[]).filter(x=>x.id!==item.id)}}),'ELIMINA DOCUMENTO',item.title, { objectType:'DOCUMENTO', objectId:item.id, metadata:{type} })
+    if (!isDirector) {
+      window.alert('SOLO IL DIRETTORE PUÒ ELIMINARE DOCUMENTI.')
+      return
+    }
+    if(!window.confirm(`ELIMINARE DEFINITIVAMENTE "${item.title || item.name}"?`)) return
+
+    const currentArchive = archiveRef.current
+    const nextArchive = normalizeArchive({
+      ...currentArchive,
+      documents:{
+        ...currentArchive.documents,
+        [type]:(currentArchive.documents?.[type] || []).filter(document => document.id !== item.id)
+      },
+      audit:[
+        ...(currentArchive.audit || []),
+        makeAuditEntry(
+          'ELIMINA DOCUMENTO',
+          item.title || item.name,
+          profile || {email:auth?.user?.email}
+        )
+      ].slice(-200),
+      updatedAt:new Date().toISOString(),
+    })
+
+    await persistArchiveImmediately(
+      nextArchive,
+      'DOCUMENTO ELIMINATO',
+      'ELIMINAZIONE SALVATA IN LOCALE'
+    )
+
+    try {
+      if(item.storagePath) await removeCloudFile(item.storagePath)
+    } catch(error) {
+      console.error(error)
+      window.alert('IL DOCUMENTO È STATO RIMOSSO DAL GESTIONALE, MA IL FILE NON È STATO CANCELLATO DALLO STORAGE.')
+    }
+
+    await writeAuditLog(
+      'ELIMINA DOCUMENTO',
+      item.title || item.name,
+      {
+        objectType:'DOCUMENTO',
+        objectId:item.id,
+        metadata:{type}
+      }
+    )
+
+    showToast('DOCUMENTO ELIMINATO')
   }
 
   function exportArchive() {
@@ -1048,8 +1142,7 @@ export default function App() {
 </div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
     {view==='library' && <main><div className="section-title"><div><h2>LIBRERIA ESERCITAZIONI</h2><p>TUTTE LE ESERCITAZIONI DELL’ARCHIVIO.</p></div><b>{filteredExercises.length} ESERCITAZIONI</b></div>{!filteredExercises.length && <EmptyState title="NESSUNA ESERCITAZIONE TROVATA" text="MODIFICA I FILTRI O AGGIUNGI UNA ESERCITAZIONE."/>}<div className="exercise-grid library">{filteredExercises.map(e=>{const s=archive.sessions.find(x=>x.id===e.sessionId);return <ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>s&&setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>})}</div></main>}
     {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} players={archive.players||[]} readOnly={!canWrite} onChange={items=>{if(!canWrite)return;commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory, { objectType:'CALENDARIO PARTITE', category:selectedCategory })}}/></main>}
-<div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
-    {toast && <div className="action-toast">{toast}</div>}
+{toast && <div className="action-toast">{toast}</div>}
     {auditOpen && <AuditCenter currentProfile={profile} localItems={archive.audit||[]} onClose={()=>setAuditOpen(false)}/>}
     {sessionModal && <SessionModal initial={sessionModal.id?sessionModal:null} allowedCategories={visibleCategories} fixedCoach={isCoach?profileCoach:''} canChooseCoach={!isCoach} onSave={saveSession} onClose={()=>setSessionModal(null)}/>} 
     {exerciseModal && <ExerciseModal session={exerciseModal.session} initial={exerciseModal.initial} onSave={saveExercise} onClose={()=>setExerciseModal(null)}/>} 

@@ -59,10 +59,7 @@ export default function SecretaryDashboard({ archive, profile, status, isOnline,
         </article>
       })}
     </main>
-
-    <div className={`cloud-pill ${isOnline?'':'offline'}`}>● {status}</div>
-
-    {expiryNotificationsOpen&&<SecretaryExpiryNotifications players={archive.players||[]} playerDocuments={archive.playerDocuments||{}} onClose={()=>setExpiryNotificationsOpen(false)}/>}
+{expiryNotificationsOpen&&<SecretaryExpiryNotifications players={archive.players||[]} playerDocuments={archive.playerDocuments||{}} onClose={()=>setExpiryNotificationsOpen(false)}/>}
     {documentsOpen&&<PlayerDocumentsManager players={archive.players} playerDocuments={archive.playerDocuments||{}} currentUser={[profile.first_name,profile.last_name].filter(Boolean).join(' ')} onChange={onSavePlayerDocuments} onClose={()=>setDocumentsOpen(false)}/>}
     {calendarsOpen&&<SecretaryCalendars matchesByCategory={archive.matchesByCategory} onClose={()=>setCalendarsOpen(false)}/>}
     {attendanceStatsOpen&&<AttendanceStatistics archive={archive} visibleCategories={CATEGORIES} onClose={()=>setAttendanceStatsOpen(false)}/>}

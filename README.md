@@ -1,21 +1,29 @@
-# ACQ Scuola Calcio · Fase 6G
+# ACQ Scuola Calcio · Fase 6H
 
-## Convocazioni aggiornate
+## Popup di sincronizzazione
 
-- rimosso il campo `Luogo di ritrovo`
-- mantenuto `Orario di ritrovo`
-- eliminato il campo testuale `Convocati, uno per riga`
-- aggiunto menu categoria
-- opzione `Tutte le categorie`
-- elenco tesserati attivi con checkbox
-- ricerca rapida per nome, cognome e categoria
-- `Seleziona visibili`
-- `Azzera visibili`
-- possibilità di convocare giocatori appartenenti a categorie diverse
-- riepilogo dei giocatori selezionati
-- conteggio convocati aggiornato nel calendario Segreteria
-- PNG della convocazione invariato nel layout e alimentato dalla nuova selezione
-- compatibilità con le vecchie convocazioni inserite manualmente
+- eliminato completamente il banner fisso in basso a destra
+- eliminato sia dalla dashboard tecnica sia dall'Area Segreteria
+- nessun movimento continuo tra “salvataggio” e “sincronizzato”
+- restano soltanto messaggi temporanei per:
+  - aggiornamento reale da un altro dispositivo
+  - passaggio offline
+  - connessione ripristinata
+  - operazione salvata
+  - errore
+
+## Materiale didattico e riunioni tecniche
+
+- upload del file nello Storage
+- salvataggio immediato della scheda documento su Supabase
+- conferma soltanto dopo entrambe le operazioni
+- protezione contro versioni Realtime più vecchie
+- pulizia automatica del file se il salvataggio archivio fallisce
+- documenti eliminabili esclusivamente dal Direttore
+- rimossa la password di eliminazione
+- nessun limite di dimensione imposto dal codice del gestionale
+
+Nota: restano inevitabilmente i limiti tecnici configurati nello Storage Supabase e quelli del browser/rete.
 
 ## Installazione
 
@@ -24,5 +32,5 @@ Non servono nuove query SQL.
 1. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
 2. Conservare `.github`.
 3. Attendere il deploy verde.
-4. Aggiornare forzatamente il browser o riaprire la PWA.
-5. Aprire `Partite` → `Convocazione`.
+4. Aggiornare con Command + Shift + R.
+5. Su iPhone/iPad chiudere e riaprire la PWA.

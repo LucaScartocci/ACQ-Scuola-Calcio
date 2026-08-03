@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import Modal from './Modal'
 import { upper, uid } from '../lib/archive'
-import { uploadCloudFile } from '../lib/storage'
+import { removeCloudFile, uploadCloudFile } from '../lib/storage'
 
 const TYPE_LABELS = {
   meetings: ['RIUNIONI TECNICHE','VERBALI, PRESENTAZIONI E DOCUMENTI DELLO STAFF'],
@@ -38,21 +38,54 @@ export default function DocumentLibrary({ type, items, onAdd, onDelete, onClose,
   },[items,search])
 
   async function submit(){
-    if(!files.length){alert('SELEZIONA ALMENO UN FILE.');return}
+    if(!files.length){
+      window.alert('SELEZIONA ALMENO UN FILE.')
+      return
+    }
+
     setBusy(true)
+    const uploaded=[]
+
     try{
-      const uploaded=[]
       for(const file of files){
-        const cloud=await uploadCloudFile(file,type==='meetings'?'riunioni-tecniche':'materiale-didattico')
+        const cloud=await uploadCloudFile(
+          file,
+          type==='meetings' ? 'riunioni-tecniche' : 'materiale-didattico'
+        )
         uploaded.push({
-          id:uid(), title:upper(title||file.name), description:'',
-          ...cloud, createdAt:Date.now(), category:type,
+          id:uid(),
+          title:upper(title || file.name),
+          description:'',
+          ...cloud,
+          createdAt:Date.now(),
+          category:type,
         })
       }
-      onAdd(uploaded)
-      setFiles([]); setTitle(''); if(inputRef.current) inputRef.current.value=''
-    }catch(error){console.error(error);alert('CARICAMENTO NON RIUSCITO: '+error.message)}
-    finally{setBusy(false)}
+
+      await onAdd(uploaded)
+
+      setFiles([])
+      setTitle('')
+      if(inputRef.current) inputRef.current.value=''
+    }catch(error){
+      console.error(error)
+
+      // If Storage succeeded but archive persistence failed, remove orphan files.
+      if(uploaded.length){
+        await Promise.allSettled(
+          uploaded
+            .filter(item=>item.storagePath)
+            .map(item=>removeCloudFile(item.storagePath))
+        )
+      }
+
+      window.alert(
+        'CARICAMENTO NON RIUSCITO. IL DOCUMENTO NON È STATO CONFERMATO NEL GESTIONALE.\n\n'
+        + (error.message || 'ERRORE SCONOSCIUTO')
+      )
+    }finally{
+      setBusy(false)
+    }
   }
 
   return <Modal title={heading} onClose={onClose} wide>
@@ -60,7 +93,7 @@ export default function DocumentLibrary({ type, items, onAdd, onDelete, onClose,
       <p className="document-subtitle">{subtitle}</p>
       {!readOnly && <section className="document-upload">
         <label>TITOLO / DESCRIZIONE<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="ES. RIUNIONE STAFF SETTEMBRE"/></label>
-        <label>FILE<input ref={inputRef} type="file" multiple onChange={e=>setFiles([...e.target.files])}/></label>
+        <label>FILE<input ref={inputRef} type="file" multiple onChange={e=>setFiles([...e.target.files])}/><small>NESSUN LIMITE IMPOSTO DAL GESTIONALE. RESTANO I LIMITI TECNICI DELLO STORAGE.</small></label>
         <button onClick={submit} disabled={busy}>{busy?'CARICAMENTO…':'＋ CARICA NEL CLOUD'}</button>
       </section>}
       {files.length>0 && <div className="pending-files">{files.map(f=><span key={f.name}>{f.name} · {sizeLabel(f.size)}</span>)}</div>}

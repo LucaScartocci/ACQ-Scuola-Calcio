@@ -1,3 +1,3 @@
-# Fase 6G
+# Fase 6H
 
-Convocazioni collegate all'anagrafica tesserati, con filtri categoria e selezione tramite checkbox.
+Hotfix popup di sincronizzazione e persistenza immediata dei documenti tecnici.

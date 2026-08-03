@@ -1358,3 +1358,54 @@
     max-height:none;
   }
 }
+
+/* FASE 6H · SINCRONIZZAZIONE DISCRETA E DOCUMENTI STABILI */
+.cloud-pill{
+  display:none!important;
+}
+
+.action-toast{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+  z-index:160;
+  max-width:min(390px,calc(100vw - 36px));
+  padding:11px 15px;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:13px;
+  background:rgba(7,27,52,.96);
+  color:#fff;
+  font-size:10px;
+  font-weight:900;
+  box-shadow:0 14px 35px rgba(0,0,0,.22);
+  pointer-events:none;
+  animation:acq-toast-in .16s ease-out;
+}
+
+@keyframes acq-toast-in{
+  from{opacity:0;transform:translateY(7px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+.document-upload label small{
+  display:block;
+  margin-top:5px;
+  color:#7a899b;
+  font-size:7px;
+  font-weight:750;
+  letter-spacing:0;
+  line-height:1.35;
+}
+
+.document-upload button:disabled{
+  opacity:.55;
+  cursor:wait;
+}
+
+@media(max-width:650px){
+  .action-toast{
+    right:10px;
+    bottom:10px;
+    max-width:calc(100vw - 20px);
+  }
+}
