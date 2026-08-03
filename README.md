@@ -1,28 +1,32 @@
-# ACQ Scuola Calcio v24 Cloud · Fase 4C
+# ACQ Scuola Calcio v24 Cloud · Fase 5A Presenze
 
-## Modifiche applicate
+## Novità
 
-- pulsante Elimina di sessioni ed esercitazioni visibile soltanto al Direttore
-- eliminazione consentita soltanto al Direttore
-- rimossa la password dalle eliminazioni
-- conferma di eliminazione mantenuta
-- valutazioni in stelle invariate
-- per modificare le stelle resta obbligatoria la password già in uso
-- stagione `2026/27` spostata a sinistra del logo
-- pulsante `ESCI` spostato sotto il logo
-- rimossa la barra visibile Annulla / Ripristina / Cronologia
-- scorciatoie da tastiera mantenute:
-  - Command/Ctrl + Z: annulla
-  - Command/Ctrl + Shift + Z: ripristina
-- Backup e Utenti restano visibili soltanto al Direttore
-- anteprima PDF invariata
+- anagrafica tesserati divisa per categoria
+- gestione tesserati riservata al Direttore
+- nome, cognome, categoria, numero maglia e stato attivo
+- pulsante `+ PRESENZE` accanto a `+ ESERCITAZIONE`
+- lista giocatori della categoria con checkbox
+- seleziona tutti e azzera
+- conteggio presenti, assenti e totali
+- presenze salvate sulla singola sessione
+- numero presenti visibile nella testata della sessione
+- nuova sezione `PRESENZE`
+- classifica individuale per numero di allenamenti
+- percentuale di presenza
+- minuti totali di allenamento
+- ultima presenza
+- filtri per categoria e giocatore
+- ordinamento per presenze, percentuale, minuti o A-Z
+- esportazione CSV
+- sincronizzazione cloud tramite archivio esistente
+- nessuna nuova query SQL necessaria
 
 ## Installazione
 
-Non servono nuove query SQL.
-
 1. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
-2. Conservare la cartella `.github`.
+2. Conservare `.github`.
 3. Attendere il deploy verde.
-4. Aggiornare forzatamente il browser.
-5. Su iPhone/iPad chiudere e riaprire la PWA.
+4. Aggiornare forzatamente il browser o riaprire la PWA.
+5. Come Direttore aprire `TESSERATI` e inserire i giocatori.
+6. Aprire una sessione e premere `+ PRESENZE`.

@@ -16,6 +16,9 @@ import StatisticsDashboard from './components/StatisticsDashboard'
 import NotificationCenter from './components/NotificationCenter'
 import BackupCenter from './components/BackupCenter'
 import SessionPdfPreview from './components/SessionPdfPreview'
+import PlayerManager from './components/PlayerManager'
+import AttendanceModal from './components/AttendanceModal'
+import AttendanceStatistics from './components/AttendanceStatistics'
 import { removeCloudFile, uploadCloudFile } from './lib/storage'
 import { generateSessionPdf } from './lib/sessionPdf'
 import './styles.css'
@@ -53,6 +56,9 @@ export default function App() {
   const [backupsOpen, setBackupsOpen] = useState(false)
   const [pdfBusySessionId, setPdfBusySessionId] = useState('')
   const [pdfPreview, setPdfPreview] = useState(null)
+  const [playersOpen, setPlayersOpen] = useState(false)
+  const [attendanceSession, setAttendanceSession] = useState(null)
+  const [attendanceStatsOpen, setAttendanceStatsOpen] = useState(false)
   const saveTimer = useRef(null)
   const applyingRemote = useRef(false)
   const undoStack = useRef([])
@@ -575,6 +581,53 @@ export default function App() {
     setExerciseModal({ session: { ...session } })
   }
 
+  function savePlayer(item) {
+    if (!isDirector) {
+      window.alert('SOLO IL DIRETTORE PUÒ GESTIRE I TESSERATI.')
+      return
+    }
+    const exists = archive.players.some(player => player.id === item.id)
+    commit(
+      current => ({
+        ...current,
+        players: exists
+          ? current.players.map(player => player.id === item.id ? item : player)
+          : [...current.players, item]
+      }),
+      exists ? 'MODIFICA TESSERATO' : 'CREA TESSERATO',
+      `${item.lastName} ${item.firstName}`,
+      {objectType:'TESSERATO',objectId:item.id,category:item.category}
+    )
+    showToast(exists ? 'TESSERATO AGGIORNATO' : 'TESSERATO INSERITO')
+  }
+
+  function saveAttendance(session, presentIds) {
+    if (!canWrite) {
+      window.alert('IL TUO RUOLO NON CONSENTE DI REGISTRARE LE PRESENZE.')
+      return
+    }
+    commit(
+      current => ({
+        ...current,
+        attendanceBySession:{
+          ...current.attendanceBySession,
+          [session.id]:{
+            sessionId:session.id,
+            category:session.category,
+            presentIds,
+            updatedAt:new Date().toISOString(),
+            updatedBy:upper([profile.first_name,profile.last_name].filter(Boolean).join(' ') || auth.user.email)
+          }
+        }
+      }),
+      'SALVA PRESENZE',
+      `${session.category} · ${presentIds.length} PRESENTI`,
+      {objectType:'PRESENZE',objectId:session.id,category:session.category,metadata:{presentCount:presentIds.length}}
+    )
+    setAttendanceSession(null)
+    showToast('PRESENZE SALVATE')
+  }
+
   function saveSession(item) {
     if (!canWrite) { window.alert('IL TUO RUOLO NON CONSENTE DI SALVARE SESSIONI.'); return }
     if (!visibleCategories.includes(item.category)) { window.alert('CATEGORIA NON AUTORIZZATA.'); return }
@@ -589,7 +642,11 @@ export default function App() {
     const session = archive.sessions.find(s => s.id === id)
     const count = archive.exercises.filter(e => e.sessionId === id).length
     if(!confirm(`ELIMINARE LA SESSIONE E LE ${count} ESERCITAZIONI AL SUO INTERNO?`)) return
-    commit(a=>({...a,sessions:a.sessions.filter(s=>s.id!==id),exercises:a.exercises.filter(e=>e.sessionId!==id)}), 'ELIMINA SESSIONE', session?.coach, { objectType:'SESSIONE', objectId:id, category:session?.category, metadata:{exerciseCount:count} })
+    commit(a=>{
+      const attendanceBySession={...a.attendanceBySession}
+      delete attendanceBySession[id]
+      return {...a,sessions:a.sessions.filter(s=>s.id!==id),exercises:a.exercises.filter(e=>e.sessionId!==id),attendanceBySession}
+    }, 'ELIMINA SESSIONE', session?.coach, { objectType:'SESSIONE', objectId:id, category:session?.category, metadata:{exerciseCount:count} })
   }
 
   async function saveExercise(item, initial) {
@@ -773,8 +830,10 @@ export default function App() {
         </button>
 
         <button className="glass" onClick={()=>setStatisticsOpen(true)}>STATISTICHE</button>
+        <button className="glass attendance-main-button" onClick={()=>setAttendanceStatsOpen(true)}>PRESENZE</button>
         <button className="glass" onClick={installApp}>INSTALLA APP</button>
 
+        {isDirector && <button className="glass admin-button" onClick={()=>setPlayersOpen(true)}>TESSERATI</button>}
         {isDirector && <button className="glass admin-button" onClick={()=>setBackupsOpen(true)}>BACKUP</button>}
         {isDirector && <button className="glass admin-button" onClick={()=>setUsersOpen(true)}>UTENTI</button>}
       </nav>
@@ -787,22 +846,26 @@ export default function App() {
     <section className="filters"><input placeholder="CERCA PER TITOLO, OBIETTIVO O PAROLA CHIAVE…" value={search} onChange={e=>setSearch(e.target.value)}/><select value={coach} onChange={e=>setCoach(e.target.value)}><option value="">ALLENATORI</option>{COACHES.map(v=><option key={v}>{v}</option>)}</select><select value={selectedCategory} onChange={e=>setSelectedCategory(e.target.value)}><option value="">CATEGORIE</option>{visibleCategories.map(v=><option key={v}>{v}</option>)}</select><select value={rating} onChange={e=>setRating(e.target.value)}><option value="">VALUTAZIONI</option>{[1,2,3,4,5].map(v=><option key={v} value={v}>{v} STELLE</option>)}</select><select value={phase} onChange={e=>setPhase(e.target.value)}><option value="">FASE ALLENAMENTO</option>{PHASES.map(v=><option key={v}>{v}</option>)}</select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="recent">PIÙ RECENTI</option><option value="az">A-Z</option><option value="players">N° GIOCATORI</option></select><button className="reset-filters" onClick={resetFilters}>AZZERA FILTRI</button></section>
     <section className="category-strip"><button className={!selectedCategory?'active':''} onClick={()=>setSelectedCategory('')}><span>▦</span><b>ARCHIVIO COMPLETO</b><small>{archive.sessions.length}SS / {archive.exercises.length}ES</small></button>{visibleCategories.map(c=>{const ss=archive.sessions.filter(s=>s.category===c).length,es=archive.exercises.filter(e=>e.category===c).length;return <button key={c} className={selectedCategory===c?'active':''} onClick={()=>setSelectedCategory(c)}><span>⚽</span><b>{c}</b><small>{ss}SS / {es}ES</small></button>})}</section>
     <nav className="view-tabs"><button className={view==='sessions'?'active':''} onClick={()=>setView('sessions')}>SESSIONI ALLENAMENTO</button><button className={view==='library'?'active':''} onClick={()=>setView('library')}>LIBRERIA ESERCITAZIONI</button>{selectedCategory&&<button className={view==='matches'?'active':''} onClick={()=>setView('matches')}>PARTITE</button>}</nav>
-    {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}'</p></div><div>
+    {view==='sessions' && <main>{!visibleSessions.length && <EmptyState title="NESSUNA SESSIONE TROVATA" text="MODIFICA I FILTRI O CREA UNA NUOVA SESSIONE."/>}{visibleSessions.map(s=><section className="session-card" key={s.id}><header><div><small>ALLENATORE</small><h2>{s.coach}</h2><p>{s.category} · {s.date} · {archive.exercises.filter(e=>e.sessionId===s.id).length} ESERCITAZIONI · {s.duration}' · {(archive.attendanceBySession[s.id]?.presentIds||[]).length} PRESENTI</p></div><div>
   <button className="pdf-session-button" onClick={()=>openSessionPdf(s)} disabled={pdfBusySessionId===s.id}>
     {pdfBusySessionId===s.id ? 'APERTURA…' : 'APRI'}
   </button>
   {canWrite && <button onClick={()=>openNewExercise(s)}>＋ ESERCITAZIONE</button>}
+  {canWrite && <button className="attendance-session-button" onClick={()=>setAttendanceSession(s)}>＋ PRESENZE</button>}
   {canWrite && <button className="soft" onClick={()=>setSessionModal(s)}>MODIFICA</button>}
   {canDelete && <button className="soft" onClick={()=>deleteSession(s.id)}>ELIMINA</button>}
 </div></header><p className="objective"><b>OBIETTIVO:</b> {s.objective}</p><div className="exercise-grid">{filteredExercises.filter(e=>e.sessionId===s.id).map(e=><ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>)}</div></section>)}</main>}
     {view==='library' && <main><div className="section-title"><div><h2>LIBRERIA ESERCITAZIONI</h2><p>TUTTE LE ESERCITAZIONI DELL’ARCHIVIO.</p></div><b>{filteredExercises.length} ESERCITAZIONI</b></div>{!filteredExercises.length && <EmptyState title="NESSUNA ESERCITAZIONE TROVATA" text="MODIFICA I FILTRI O AGGIUNGI UNA ESERCITAZIONE."/>}<div className="exercise-grid library">{filteredExercises.map(e=>{const s=archive.sessions.find(x=>x.id===e.sessionId);return <ExerciseCard e={e} key={e.id} canWrite={canWrite} canDelete={canDelete} onEdit={()=>s&&setExerciseModal({session:s,initial:e})} onDelete={()=>deleteExercise(e.id)}/>})}</div></main>}
     {view==='matches' && selectedCategory && <main><Matches category={selectedCategory} matches={archive.matchesByCategory[selectedCategory]||[]} readOnly={!canWrite} onChange={items=>{if(!canWrite)return;commit(a=>({...a,matchesByCategory:{...a.matchesByCategory,[selectedCategory]:items}}),'MODIFICA PARTITE',selectedCategory, { objectType:'CALENDARIO PARTITE', category:selectedCategory })}}/></main>}
-    <div className="build-badge">FASE 4C · UI</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
+    <div className="build-badge">FASE 5A · PRESENZE</div><div className={`cloud-pill ${isOnline ? "" : "offline"}`}>● {status}</div>
     {toast && <div className="action-toast">{toast}</div>}
-    {auditOpen && <AuditModal items={archive.audit||[]} onClose={()=>setAuditOpen(false)}/>}
+    {auditOpen && <AuditCenter currentProfile={profile} localItems={archive.audit||[]} onClose={()=>setAuditOpen(false)}/>}
     {sessionModal && <SessionModal initial={sessionModal.id?sessionModal:null} allowedCategories={visibleCategories} fixedCoach={isCoach?profileCoach:''} canChooseCoach={!isCoach} onSave={saveSession} onClose={()=>setSessionModal(null)}/>} 
     {exerciseModal && <ExerciseModal session={exerciseModal.session} initial={exerciseModal.initial} onSave={saveExercise} onClose={()=>setExerciseModal(null)}/>} 
     {pdfPreview && <SessionPdfPreview pdf={pdfPreview} onClose={()=>setPdfPreview(null)}/>}
+    {attendanceSession && <AttendanceModal session={attendanceSession} players={archive.players} attendance={archive.attendanceBySession[attendanceSession.id]} onSave={presentIds=>saveAttendance(attendanceSession,presentIds)} onClose={()=>setAttendanceSession(null)}/>}
+    {attendanceStatsOpen && <AttendanceStatistics archive={archive} visibleCategories={visibleCategories} onClose={()=>setAttendanceStatsOpen(false)}/>}
+    {playersOpen && <PlayerManager players={archive.players} onSave={savePlayer} onClose={()=>setPlayersOpen(false)}/>}
     {backupsOpen && <BackupCenter archive={archive} profile={profile} canRestore={canDelete} onRestore={restoreArchiveFromBackup} onClose={()=>setBackupsOpen(false)}/>}
     {notificationsOpen && <NotificationCenter
       profile={profile}

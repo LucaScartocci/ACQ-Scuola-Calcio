@@ -354,3 +354,40 @@
   .hero-brand-top{width:100%;justify-content:space-between}
   .hero-exit{width:100%;margin:0}
 }
+
+/* FASE 5A: TESSERATI, PRESENZE E STATISTICHE INDIVIDUALI */
+.attendance-main-button{border-color:rgba(82,196,137,.5)!important;background:rgba(82,196,137,.12)!important}
+.attendance-session-button{background:#e8f7ef!important;color:#167245!important;border-color:#b9e2cc!important}
+
+.players-manager,.attendance-modal,.attendance-stats{padding:20px 22px 26px;background:#f5f8fc}
+.players-toolbar{display:grid;grid-template-columns:.8fr 1.5fr auto;gap:10px;align-items:center}
+.players-toolbar select,.players-toolbar input{min-height:46px;border:1px solid #d0ddec;border-radius:12px;padding:10px 12px;background:#fff;font-weight:800}
+.players-toolbar b{padding:12px;border-radius:12px;background:#eaf2fc;color:#0f5cc0;font-size:11px}
+.players-layout{display:grid;grid-template-columns:330px 1fr;gap:14px;margin-top:14px}
+.player-form{display:flex;flex-direction:column;gap:10px;padding:17px;border:1px solid #d8e4f0;border-radius:18px;background:#fff}
+.player-form h3{margin:0 0 4px;color:#153552}.player-form label{display:grid;gap:6px;color:#6c7d91;font-size:9px;font-weight:900}
+.player-form input,.player-form select{min-height:43px;border:1px solid #d1deec;border-radius:11px;padding:9px}
+.player-form .player-active{display:flex;align-items:center}.player-active input{min-height:auto}
+.player-form footer{display:flex;gap:8px;margin-top:5px}.player-form button,.players-list button{min-height:40px;border:0;border-radius:10px;padding:9px 12px;background:#071b34;color:#fff;font-size:9px;font-weight:900}
+.player-form button.soft{background:#edf4fc;color:#173652}
+.players-list{display:flex;flex-direction:column;gap:8px;max-height:64vh;overflow:auto}
+.players-list article{display:grid;grid-template-columns:46px 1fr auto;gap:11px;align-items:center;padding:12px;border:1px solid #d8e4f0;border-radius:14px;background:#fff}
+.players-list article.inactive{opacity:.55}.player-number{width:42px;height:42px;display:grid;place-items:center;border-radius:50%;background:#0f5cc0;color:#fff;font-weight:900}
+.players-list article>div:nth-child(2){display:grid;gap:3px}.players-list b{color:#153552}.players-list span{color:#7c8b9e;font-size:9px;font-weight:800}
+
+.attendance-modal>header{display:flex;justify-content:space-between;gap:16px;padding:19px;border-radius:19px;background:linear-gradient(135deg,#071b34,#0f5cc0);color:#fff}
+.attendance-modal header small{color:#bed5f2;font-size:9px;font-weight:900}.attendance-modal h2{margin:5px 0 2px}.attendance-modal header p{margin:0;color:#d8e6f7;font-size:10px}
+.attendance-counts{display:flex;gap:8px}.attendance-counts span{display:grid;place-items:center;min-width:82px;padding:10px;border:1px solid #ffffff33;border-radius:13px;background:#ffffff12;font-size:8px;font-weight:900}.attendance-counts b{font-size:23px}
+.attendance-toolbar{display:grid;grid-template-columns:1fr auto auto;gap:9px;margin-top:12px}.attendance-toolbar input,.attendance-toolbar button{min-height:44px;border:1px solid #d0ddec;border-radius:11px;padding:9px 11px;background:#fff;font-weight:800}.attendance-toolbar button.soft{background:#edf4fc}
+.attendance-list{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px;max-height:55vh;overflow:auto}
+.attendance-list label{display:grid;grid-template-columns:34px 35px 1fr;gap:9px;align-items:center;padding:11px;border:1px solid #d8e4f0;border-radius:13px;background:#fff;cursor:pointer}.attendance-list label.present{border-color:#5ab786;background:#edfaf3}
+.attendance-list input{display:none}.attendance-box{width:28px;height:28px;display:grid;place-items:center;border:2px solid #b9c9dc;border-radius:7px;color:transparent;font-weight:900}.present .attendance-box{border-color:#198754;background:#198754;color:#fff}.attendance-number{color:#0f5cc0;font-weight:900}.attendance-list b{color:#183652;font-size:11px}
+.attendance-modal>footer{display:flex;justify-content:flex-end;gap:9px;margin-top:14px}.attendance-modal>footer button{min-height:44px;border:0;border-radius:11px;padding:10px 14px;background:#071b34;color:#fff;font-weight:900}.attendance-modal>footer button.ghost{background:#fff;color:#173652;border:1px solid #ccdbea}
+
+.attendance-stats-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;padding:20px;border-radius:20px;background:linear-gradient(135deg,#071b34,#0f5cc0);color:#fff}.attendance-stats-heading small{color:#bcd3ef;font-size:9px;font-weight:900}.attendance-stats-heading h2{margin:5px 0 2px}.attendance-stats-heading p{margin:0;color:#d8e6f7;font-size:10px}.attendance-stats-heading button{min-height:44px;border:0;border-radius:11px;padding:10px 14px;background:#fff;color:#0b3159;font-weight:900}
+.attendance-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}.attendance-kpis article{display:grid;gap:5px;padding:14px;border:1px solid #d8e4f0;border-radius:15px;background:#fff}.attendance-kpis small{color:#758599;font-size:8px;font-weight:900}.attendance-kpis b{color:#153552;font-size:24px}.attendance-kpis .kpi-name{font-size:13px}
+.attendance-stats-filters{display:grid;grid-template-columns:1.4fr .8fr .8fr;gap:9px;margin-top:12px}.attendance-stats-filters input,.attendance-stats-filters select{min-height:44px;border:1px solid #d0ddec;border-radius:11px;padding:9px 11px;background:#fff;font-weight:800}
+.attendance-ranking{display:flex;flex-direction:column;gap:8px;margin-top:13px;max-height:58vh;overflow:auto}.attendance-ranking article{display:grid;grid-template-columns:42px 1.4fr 1fr 75px 75px 85px;gap:10px;align-items:center;padding:11px;border:1px solid #d9e4ef;border-radius:14px;background:#fff}.attendance-ranking strong{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;background:#0f5cc0;color:#fff;font-size:10px}.attendance-player-name{display:grid;gap:3px}.attendance-player-name b{color:#153552}.attendance-player-name span{color:#7d8b9e;font-size:8px;font-weight:800}.attendance-progress{display:flex;align-items:center;gap:7px}.attendance-progress>div{flex:1;height:8px;border-radius:999px;background:#edf3f9;overflow:hidden}.attendance-progress i{display:block;height:100%;background:linear-gradient(90deg,#198754,#64c692);border-radius:999px}.attendance-progress small{color:#198754;font-weight:900}.attendance-ranking article>div:nth-last-of-type(-n+2){display:grid;text-align:center}.attendance-ranking article>div:nth-last-of-type(-n+2) b{color:#153552}.attendance-ranking article>div:nth-last-of-type(-n+2) small{font-size:7px;color:#7b899b;font-weight:900}.attendance-ranking time{color:#0f5cc0;font-size:9px;font-weight:900;text-align:right}
+
+@media(max-width:900px){.players-layout{grid-template-columns:1fr}.attendance-kpis{grid-template-columns:1fr 1fr}.attendance-ranking article{grid-template-columns:40px 1fr 90px 65px}.attendance-ranking article>div:nth-last-of-type(2),.attendance-ranking time{display:none}}
+@media(max-width:650px){.players-manager,.attendance-modal,.attendance-stats{padding:12px}.players-toolbar,.attendance-toolbar,.attendance-stats-filters{grid-template-columns:1fr}.attendance-modal>header,.attendance-stats-heading{align-items:flex-start;flex-direction:column}.attendance-counts{width:100%}.attendance-counts span{flex:1;min-width:0}.attendance-list{grid-template-columns:1fr}.attendance-kpis{grid-template-columns:1fr 1fr}.attendance-ranking article{grid-template-columns:38px 1fr 70px}.attendance-progress{display:none}.attendance-ranking article>div:nth-last-of-type(2){display:grid}.attendance-stats-heading button{width:100%}}

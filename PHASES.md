@@ -1,7 +1,6 @@
 # Stato progetto
 
-- Fase 4A: PDF professionale con QR Code
-- Fase 4B: anteprima PDF e pulizia menu
-- Fase 4C: permessi eliminazione, header e pulizia interfaccia
+- Fase 4: PDF e rifiniture UI
+- Fase 5A: anagrafica tesserati, presenze e statistiche individuali
 
-Il gestionale è ora nella fase di collaudo e rifinitura finale.
+Il prossimo lavoro consigliato è esclusivamente collaudo e correzione di eventuali dettagli.

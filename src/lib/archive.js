@@ -4,7 +4,7 @@ export const COACHES = [
 ]
 export const CATEGORIES = ['PICCOLI AMICI','PRIMI CALCI','PULCINI','ESORDIENTI']
 export const PHASES = ['ATTIVAZIONE','PARTE CENTRALE','PARTITA A TEMA']
-export const ARCHIVE_VERSION = 3
+export const ARCHIVE_VERSION = 4
 export const ADMIN_PASSWORD = 'vittoriout'
 
 const safeId = prefix => {
@@ -25,6 +25,8 @@ export const emptyArchive = () => ({
   exercises: [],
   matchesByCategory: Object.fromEntries(CATEGORIES.map(c => [c, Array.from({ length: 30 }, (_, i) => emptyMatch(i + 1))])),
   documents: { meetings: [], teaching: [] },
+  players: [],
+  attendanceBySession: {},
   audit: [],
   updatedAt: new Date().toISOString(),
 })
@@ -54,6 +56,9 @@ export const normalizeArchive = (value) => {
   const rawSessions = Array.isArray(value.sessions) ? value.sessions : []
   const rawExercises = Array.isArray(value.exercises) ? value.exercises : []
   const rawDocuments = value.documents || value.documentLibraries || { meetings: [], teaching: [] }
+  const rawPlayers = Array.isArray(value.players) ? value.players : []
+  const rawAttendance = value.attendanceBySession && typeof value.attendanceBySession === 'object'
+    ? value.attendanceBySession : {}
 
   const archive = {
     version: ARCHIVE_VERSION,
@@ -88,6 +93,28 @@ export const normalizeArchive = (value) => {
       meetings: Array.isArray(rawDocuments.meetings) ? rawDocuments.meetings.map(normalizeDocument) : [],
       teaching: Array.isArray(rawDocuments.teaching) ? rawDocuments.teaching.map(normalizeDocument) : [],
     },
+    players: rawPlayers.map(player => ({
+      ...player,
+      id: player.id || safeId('player'),
+      firstName: upper(player.firstName || player.name || ''),
+      lastName: upper(player.lastName || player.surname || ''),
+      category: normalizeCategory(player.category),
+      shirtNumber: player.shirtNumber === '' || player.shirtNumber == null ? '' : Number(player.shirtNumber),
+      active: player.active !== false,
+      createdAt: Number(player.createdAt) || Date.now(),
+    })),
+    attendanceBySession: Object.fromEntries(
+      Object.entries(rawAttendance).map(([sessionId, record]) => [
+        sessionId,
+        {
+          sessionId,
+          category: normalizeCategory(record?.category || ''),
+          presentIds: Array.isArray(record?.presentIds) ? [...new Set(record.presentIds.map(String))] : [],
+          updatedAt: record?.updatedAt || new Date().toISOString(),
+          updatedBy: upper(record?.updatedBy || ''),
+        }
+      ])
+    ),
     audit: Array.isArray(value.audit) ? value.audit.slice(-200) : [],
     updatedAt: value.updatedAt || new Date().toISOString(),
   }
