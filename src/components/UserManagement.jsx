@@ -7,7 +7,7 @@ const ROLES = [
   ['director','DIRETTORE TECNICO'],
   ['coordinator','COORDINATORE'],
   ['coach','ALLENATORE'],
-  ['collaborator','COLLABORATORE'],
+  ['secretary','SEGRETARIO'],
 ]
 
 export default function UserManagement({ currentProfile, onClose, onChanged }) {
@@ -111,7 +111,7 @@ export default function UserManagement({ currentProfile, onClose, onChanged }) {
                 <input value={profile.last_name || ''} onChange={event => patchLocal(profile.id,{last_name:event.target.value})}/>
               </label>
               <label>RUOLO
-                <select value={profile.role || 'collaborator'} onChange={event => patchLocal(profile.id,{role:event.target.value})}>
+                <select value={profile.role || 'coach'} onChange={event => patchLocal(profile.id,{role:event.target.value})}>
                   {ROLES.map(([value,label]) => <option value={value} key={value}>{label}</option>)}
                 </select>
               </label>

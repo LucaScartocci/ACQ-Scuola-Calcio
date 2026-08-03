@@ -1,40 +1,57 @@
-# ACQ Scuola Calcio v24 Cloud · Fase 5D
+# ACQ Scuola Calcio · Fase 6C
 
-## Modifiche presenze
+## Correzione prioritaria
 
-- in ogni sessione è possibile selezionare giocatori di qualsiasi categoria
-- menu categoria preimpostato sulla categoria della seduta
-- opzione Tutte le categorie
-- ricerca per nome, cognome e categoria
-- Seleziona visibili e Azzera visibili
-- i giocatori già selezionati restano presenti anche cambiando filtro
-- riepilogo completo dei giocatori selezionati
-- categoria visibile accanto a ogni giocatore
+Il Segretario viene ora riconosciuto correttamente anche quando il ruolo nel database contiene:
 
-## Modifiche PDF
+- `secretary`
+- `SEGRETARIO`
+- `segretario`
+- spazi accidentali
+- lettere maiuscole
 
-- PDF ridotto a massimo 2 pagine
-- pagina 1:
-  - dati della seduta
-  - obiettivo
-  - numero presenti
-  - elenco presenze diviso per categoria
-  - riepilogo minuti ed esercitazioni
-- pagina 2:
-  - esercitazioni in formato compatto
-  - immagine, titolo, fase, durata, giocatori, spazio e obiettivo
-  - QR Code per ogni esercitazione
-- massimo 6 esercitazioni mostrate nella seconda pagina
-- eventuali esercitazioni aggiuntive vengono segnalate senza creare altre pagine
+Il Segretario carica esclusivamente la propria dashboard dedicata.
+
+## Dashboard Segretario
+
+Mostra soltanto:
+
+- Tesserati
+- Calendari partite
+- Presenze
+- Scadenze
+- elenco delle sessioni con dati generali e presenze
+
+Non mostra:
+
+- creazione sessioni
+- riunioni tecniche
+- materiale didattico
+- notifiche tecniche
+- statistiche tecniche
+- filtri esercitazioni
+- archivio completo
+- libreria esercitazioni
+- valutazioni
+- backup
+- utenti
+
+## Collaboratore rimosso
+
+- eliminato dal menu Ruoli
+- eventuali vecchi Collaboratori vengono convertiti in Allenatori
+- i nuovi utenti hanno come ruolo predefinito Allenatore
+- ruoli consentiti:
+  - Direttore
+  - Coordinatore
+  - Allenatore
+  - Segretario
 
 ## Installazione
 
-Non servono nuove query SQL.
-
-1. Caricare tutti i file su GitHub sovrascrivendo quelli esistenti.
-2. Conservare `.github`.
-3. Attendere il deploy verde.
-4. Aggiornare forzatamente il browser o riaprire la PWA.
-5. Aprire una sessione → `+ PRESENZE`.
-6. Selezionare giocatori anche da categorie diverse.
-7. Premere `APRI` per controllare il PDF di 2 pagine.
+1. Eseguire `supabase_phase6c.sql` in Supabase SQL Editor.
+2. Attendere `Success`.
+3. Caricare tutti i file su GitHub.
+4. Attendere il deploy verde.
+5. Fare logout e login con il Segretario.
+6. Aggiornare forzatamente il browser o riaprire la PWA.

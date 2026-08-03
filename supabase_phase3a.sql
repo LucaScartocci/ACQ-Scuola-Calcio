@@ -6,8 +6,8 @@ create table if not exists public.user_profiles (
   email text not null,
   first_name text not null default '',
   last_name text not null default '',
-  role text not null default 'collaborator'
-    check (role in ('director','coordinator','coach','collaborator')),
+  role text not null default 'coach'
+    check (role in ('director','coordinator','coach','secretary')),
   categories text[] not null default '{}',
   coach_name text not null default '',
   active boolean not null default true,
@@ -56,7 +56,7 @@ begin
     coalesce(new.email,''),
     upper(coalesce(new.raw_user_meta_data->>'first_name','')),
     upper(coalesce(new.raw_user_meta_data->>'last_name','')),
-    'collaborator',
+    'coach',
     '{}',
     '',
     true
@@ -77,7 +77,7 @@ select
   coalesce(email,''),
   upper(coalesce(raw_user_meta_data->>'first_name','')),
   upper(coalesce(raw_user_meta_data->>'last_name','')),
-  case when email='lucascartocci@gmail.com' then 'director' else 'collaborator' end,
+  case when email='lucascartocci@gmail.com' then 'director' else 'coach' end,
   case when email='lucascartocci@gmail.com'
     then array['PICCOLI AMICI','PRIMI CALCI','PULCINI','ESORDIENTI']::text[]
     else '{}'::text[]

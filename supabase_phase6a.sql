@@ -6,7 +6,7 @@ drop constraint if exists user_profiles_role_check;
 
 alter table public.user_profiles
 add constraint user_profiles_role_check
-check (role in ('director','coordinator','coach','collaborator','secretary'));
+check (role in ('director','coordinator','coach','secretary'));
 
 -- Il Segretario deve poter leggere e aggiornare l'archivio condiviso
 -- per presenze, tesserati e documenti. La UI dedicata impedisce

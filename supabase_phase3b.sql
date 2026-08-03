@@ -73,7 +73,7 @@ using (
     from public.user_profiles profile
     where profile.id = auth.uid()
       and profile.active = true
-      and profile.role in ('coach','collaborator')
+      and profile.role in ('coach','secretary')
   )
 );
 
