@@ -66,6 +66,12 @@ export default function App() {
   const fileInput = useRef(null)
   const legacyArchive = useMemo(() => readLegacyArchive(), [])
   const loginAuditWritten = useRef('')
+  const archiveRef = useRef(archive)
+  const skipNextAutoSave = useRef(false)
+
+  useEffect(() => {
+    archiveRef.current = archive
+  }, [archive])
 
   const showToast = useCallback(message => {
     setToast(message)
@@ -304,7 +310,10 @@ export default function App() {
         if (!payload.new || !payload.new.data || applyingRemote.current) return
         const next = normalizeArchive(payload.new.data)
         setArchive(current => {
-          if (current.updatedAt && next.updatedAt && current.updatedAt === next.updatedAt) return current
+          const currentTime = Date.parse(current.updatedAt || '') || 0
+          const nextTime = Date.parse(next.updatedAt || '') || 0
+          if (currentTime && nextTime && nextTime <= currentTime) return current
+          archiveRef.current = next
           localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(next))
           return next
         })
@@ -318,6 +327,10 @@ export default function App() {
 
   useEffect(() => {
     if (!auth || !hydrated || applyingRemote.current || !canWrite) return
+    if (skipNextAutoSave.current) {
+      skipNextAutoSave.current = false
+      return
+    }
     localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(archive))
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
@@ -478,16 +491,18 @@ export default function App() {
     return true
   }
 
-  async function persistArchiveImmediately(nextArchive, successMessage = 'ARCHIVIO SINCRONIZZATO') {
+  async function persistArchiveImmediately(nextArchive, successMessage = 'ARCHIVIO SINCRONIZZATO', offlineMessage = 'MODIFICA SALVATA IN LOCALE') {
     const normalized = normalizeArchive({ ...nextArchive, updatedAt: new Date().toISOString() })
+    skipNextAutoSave.current = true
     applyingRemote.current = true
+    archiveRef.current = normalized
     setArchive(normalized)
     localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(normalized))
     applyingRemote.current = false
 
     if (!navigator.onLine) {
       setStatus('MODALITÀ OFFLINE · MODIFICHE IN ATTESA')
-      showToast('ESERCITAZIONE SALVATA IN LOCALE')
+      showToast(offlineMessage)
       return normalized
     }
 
@@ -628,13 +643,84 @@ export default function App() {
     showToast('PRESENZE SALVATE')
   }
 
-  function saveSession(item) {
-    if (!canWrite) { window.alert('IL TUO RUOLO NON CONSENTE DI SALVARE SESSIONI.'); return }
-    if (!visibleCategories.includes(item.category)) { window.alert('CATEGORIA NON AUTORIZZATA.'); return }
-    if (isCoach && profileCoach && upper(item.coach) !== profileCoach) { window.alert('PUOI CREARE SESSIONI SOLTANTO PER IL TUO PROFILO ALLENATORE.'); return }
-    const exists = archive.sessions.some(s => s.id === item.id)
-    commit(a => ({...a,sessions:exists?a.sessions.map(s=>s.id===item.id?item:s):[...a.sessions,item]}), exists ? 'MODIFICA SESSIONE' : 'CREA SESSIONE', item.coach, { objectType:'SESSIONE', objectId:item.id, category:item.category })
+  async function saveSession(item) {
+    if (!canWrite) {
+      window.alert('IL TUO RUOLO NON CONSENTE DI SALVARE SESSIONI.')
+      throw new Error('PERMESSO NEGATO')
+    }
+    if (!visibleCategories.includes(item.category)) {
+      window.alert('CATEGORIA NON AUTORIZZATA.')
+      throw new Error('CATEGORIA NON AUTORIZZATA')
+    }
+    if (isCoach && profileCoach && upper(item.coach) !== profileCoach) {
+      window.alert('PUOI CREARE SESSIONI SOLTANTO PER IL TUO PROFILO ALLENATORE.')
+      throw new Error('ALLENATORE NON AUTORIZZATO')
+    }
+
+    const currentArchive = archiveRef.current
+    const exists = currentArchive.sessions.some(session => String(session.id) === String(item.id))
+    const cleanItem = {
+      ...item,
+      id:String(item.id),
+      coach:upper(item.coach),
+      category:upper(item.category),
+      date:String(item.date || ''),
+      duration:Number(item.duration) || 90,
+      players:Number(item.players) || 16,
+      field:upper(item.field || ''),
+      objective:upper(item.objective || ''),
+      staffNotes:upper(item.staffNotes || ''),
+      createdAt:Number(item.createdAt) || Date.now(),
+    }
+
+    const sessions = exists
+      ? currentArchive.sessions.map(session => String(session.id) === String(cleanItem.id) ? cleanItem : session)
+      : [...currentArchive.sessions, cleanItem]
+
+    const nextArchive = normalizeArchive({
+      ...currentArchive,
+      sessions,
+      audit:[
+        ...(currentArchive.audit || []),
+        makeAuditEntry(
+          exists ? 'MODIFICA SESSIONE' : 'CREA SESSIONE',
+          cleanItem.coach,
+          profile || {email:auth?.user?.email}
+        )
+      ].slice(-200),
+      updatedAt:new Date().toISOString(),
+    })
+
+    if (!exists) {
+      undoStack.current.push(currentArchive)
+      if (undoStack.current.length > HISTORY_LIMIT) undoStack.current.shift()
+      redoStack.current = []
+    }
+
+    await persistArchiveImmediately(
+      nextArchive,
+      exists ? 'SESSIONE MODIFICATA' : 'SESSIONE CREATA',
+      exists ? 'SESSIONE MODIFICATA IN LOCALE' : 'SESSIONE CREATA IN LOCALE'
+    )
+
+    await writeAuditLog(
+      exists ? 'MODIFICA SESSIONE' : 'CREA SESSIONE',
+      cleanItem.coach,
+      {
+        objectType:'SESSIONE',
+        objectId:cleanItem.id,
+        category:cleanItem.category,
+      }
+    )
+
+    setSelectedCategory(cleanItem.category)
+    setView('sessions')
+    setSearch('')
+    setCoach('')
+    setPhase('')
+    setRating('')
     setSessionModal(null)
+    showToast(exists ? 'SESSIONE MODIFICATA' : `SESSIONE CREATA · ${cleanItem.category}`)
   }
 
   function deleteSession(id) {

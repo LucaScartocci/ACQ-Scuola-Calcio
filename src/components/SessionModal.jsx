@@ -5,6 +5,7 @@ import { CATEGORIES, COACHES, upper, uid } from '../lib/archive'
 export default function SessionModal({ initial, onSave, onClose, allowedCategories = CATEGORIES, fixedCoach = '', canChooseCoach = true }) {
   const categories = allowedCategories.length ? allowedCategories : CATEGORIES
   const defaultCoach = fixedCoach || COACHES[0]
+  const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({
     coach: defaultCoach,
     category: categories[0],
@@ -28,25 +29,32 @@ export default function SessionModal({ initial, onSave, onClose, allowedCategori
     }
   }, [initial, fixedCoach, defaultCoach, categories.join('|')])
 
-  const set = (key, value) => setForm(value => ({ ...value, [key]: value }))
 
   function change(key, value) {
     setForm(current => ({ ...current, [key]: value }))
   }
 
   return <Modal title={initial ? 'MODIFICA SESSIONE' : 'NUOVA SESSIONE ALLENAMENTO'} onClose={onClose}>
-    <form className="form-grid" onSubmit={event => {
+    <form className="form-grid" onSubmit={async event => {
       event.preventDefault()
-      onSave({
-        ...form,
-        id: initial?.id || uid(),
-        coach: upper(fixedCoach || form.coach),
-        category: form.category,
-        field: upper(form.field),
-        objective: upper(form.objective),
-        staffNotes: upper(form.staffNotes),
-        createdAt: initial?.createdAt || Date.now()
-      })
+      if (busy) return
+      setBusy(true)
+      try {
+        await onSave({
+          ...form,
+          id: initial?.id || uid(),
+          coach: upper(fixedCoach || form.coach),
+          category: form.category,
+          field: upper(form.field),
+          objective: upper(form.objective),
+          staffNotes: upper(form.staffNotes),
+          createdAt: initial?.createdAt || Date.now()
+        })
+      } catch (error) {
+        console.error('SESSION SAVE ERROR', error)
+      } finally {
+        setBusy(false)
+      }
     }}>
       <label className="full">NOME ALLENATORE
         <select value={fixedCoach || form.coach} disabled={!canChooseCoach || Boolean(fixedCoach)} onChange={event => change('coach', event.target.value)}>
@@ -64,7 +72,7 @@ export default function SessionModal({ initial, onSave, onClose, allowedCategori
       <label>CAMPO / LUOGO<input value={form.field || ''} onChange={event => change('field', event.target.value)} placeholder="ES. CAMPO A"/></label>
       <label className="full">OBIETTIVO DELLA SEDUTA<textarea value={form.objective} onChange={event => change('objective', event.target.value)} /></label>
       <label className="full">NOTE DELLO STAFF PER IL PDF<textarea value={form.staffNotes || ''} onChange={event => change('staffNotes', event.target.value)} placeholder="NOTE ORGANIZZATIVE, COACHING POINTS GENERALI, INDICAZIONI FINALI…"/></label>
-      <footer className="modal-actions full"><button type="button" className="ghost" onClick={onClose}>ANNULLA</button><button>SALVA SESSIONE</button></footer>
+      <footer className="modal-actions full"><button type="button" className="ghost" onClick={onClose} disabled={busy}>ANNULLA</button><button disabled={busy}>{busy ? 'SALVATAGGIO…' : 'SALVA SESSIONE'}</button></footer>
     </form>
   </Modal>
 }
