@@ -1,3 +1,3 @@
-# Fase 6H
+# Fase 6I
 
-Hotfix popup di sincronizzazione e persistenza immediata dei documenti tecnici.
+Rifinitura grafica della sezione di caricamento documenti.

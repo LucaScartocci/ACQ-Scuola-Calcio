@@ -91,12 +91,73 @@ export default function DocumentLibrary({ type, items, onAdd, onDelete, onClose,
   return <Modal title={heading} onClose={onClose} wide>
     <div className="document-library">
       <p className="document-subtitle">{subtitle}</p>
-      {!readOnly && <section className="document-upload">
-        <label>TITOLO / DESCRIZIONE<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="ES. RIUNIONE STAFF SETTEMBRE"/></label>
-        <label>FILE<input ref={inputRef} type="file" multiple onChange={e=>setFiles([...e.target.files])}/><small>NESSUN LIMITE IMPOSTO DAL GESTIONALE. RESTANO I LIMITI TECNICI DELLO STORAGE.</small></label>
-        <button onClick={submit} disabled={busy}>{busy?'CARICAMENTO…':'＋ CARICA NEL CLOUD'}</button>
+      {!readOnly && <section className="document-upload document-upload-refined">
+        <label className="document-title-field">
+          <span>TITOLO / DESCRIZIONE</span>
+          <input
+            value={title}
+            onChange={event=>setTitle(event.target.value)}
+            placeholder="ES. RIUNIONE STAFF SETTEMBRE"
+          />
+        </label>
+
+        <div className="document-file-field">
+          <span className="document-field-label">FILE</span>
+
+          <button
+            type="button"
+            className="document-file-picker"
+            onClick={()=>inputRef.current?.click()}
+            disabled={busy}
+          >
+            <strong>{files.length ? `${files.length} FILE SELEZIONAT${files.length === 1 ? 'O' : 'I'}` : 'SCEGLI FILE'}</strong>
+            <small>
+              {files.length
+                ? files.map(file=>file.name).join(' · ')
+                : 'DOCUMENTI, IMMAGINI E VIDEO'}
+            </small>
+          </button>
+
+          <input
+            ref={inputRef}
+            className="document-hidden-input"
+            type="file"
+            multiple
+            onChange={event=>setFiles([...event.target.files])}
+          />
+
+          <small className="document-format-note">
+            PDF · DOCX · XLSX · PPTX · MP4 · MOV · JPG · PNG
+          </small>
+        </div>
+
+        <button
+          type="button"
+          className="document-cloud-button"
+          onClick={submit}
+          disabled={busy || !files.length}
+        >
+          {busy ? 'CARICAMENTO…' : '＋ CARICA FILE'}
+        </button>
       </section>}
-      {files.length>0 && <div className="pending-files">{files.map(f=><span key={f.name}>{f.name} · {sizeLabel(f.size)}</span>)}</div>}
+
+      {files.length>0 && <div className="pending-files pending-files-refined">
+        {files.map((file,index)=><span key={`${file.name}-${index}`}>
+          <span>
+            <b>{file.name}</b>
+            <small>{sizeLabel(file.size)}</small>
+          </span>
+          <button
+            type="button"
+            aria-label={`Rimuovi ${file.name}`}
+            onClick={()=>{
+              const next=files.filter((_,fileIndex)=>fileIndex!==index)
+              setFiles(next)
+              if(!next.length && inputRef.current) inputRef.current.value=''
+            }}
+          >×</button>
+        </span>)}
+      </div>}
       <input className="document-search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="CERCA NELLA LIBRERIA…"/>
       <div className="document-grid">
         {visible.map(item=><article className="document-card" key={item.id}>
